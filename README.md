@@ -18,3 +18,7 @@ Version: 0.4.4
 2. `git subtree add --prefix <path-to-repo> <name> <branch/commit> --squash`
 
 Reference: https://www.atlassian.com/git/tutorials/git-subtree
+
+## To update a package from source
+
+`git subtree pull --prefix <name> <repo url> <branch/commit> --squash`
