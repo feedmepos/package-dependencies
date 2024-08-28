@@ -10,4 +10,11 @@ Version: 0.4.4
 
 ## Setup
 
-`git clone <repo> --recurse-submodules`
+`git clone <repo>`
+
+## To add a new package
+
+1. `git remote add -f <name> <repo url>`
+2. `git subtree add --prefix <path-to-repo> <name> <branch/commit> --squash`
+
+Reference: https://www.atlassian.com/git/tutorials/git-subtree
