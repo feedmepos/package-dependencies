@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'package:swipeable_page_route/swipeable_page_route.dart';
 
 import 'go_router.dart';
@@ -129,30 +130,38 @@ class _SecondPageState extends State<SecondPage> {
           ),
         ],
       ),
-      body: SizedBox.expand(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragStart: (details) {
+          context.read<SwipeableBackGestureDetector>().reset();
+        },
+        child: ListView(
           children: [
-            Text('Can swipe: ${pageRoute.canSwipe}'),
-            TextButton(
-              onPressed: () {
-                // You can disable swiping completely using `canSwipe`:
-                setState(() => pageRoute.canSwipe = !pageRoute.canSwipe);
-              },
-              child: const Text('Toggle'),
-            ),
-            Text('Can only swipe from edge: ${pageRoute.canOnlySwipeFromEdge}'),
-            TextButton(
-              onPressed: () => setState(
-                () => pageRoute.canOnlySwipeFromEdge =
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('Can swipe: ${pageRoute.canSwipe}'),
+                TextButton(
+                  onPressed: () {
+                    // You can disable swiping completely using `canSwipe`:
+                    setState(() => pageRoute.canSwipe = !pageRoute.canSwipe);
+                  },
+                  child: const Text('Toggle'),
+                ),
+                Text('Can only swipe from edge: ${pageRoute.canOnlySwipeFromEdge}'),
+                TextButton(
+                  onPressed: () => setState(
+                        () => pageRoute.canOnlySwipeFromEdge =
                     !pageRoute.canOnlySwipeFromEdge,
-              ),
-              child: const Text('Toggle'),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: () async => _pushThirdPage(context),
-              child: const Text('Open page 3'),
+                  ),
+                  child: const Text('Toggle'),
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton(
+                  onPressed: () async => _pushThirdPage(context),
+                  child: const Text('Open page 3'),
+                ),
+              ],
             ),
           ],
         ),

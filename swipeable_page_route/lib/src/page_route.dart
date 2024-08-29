@@ -5,6 +5,7 @@ import 'package:black_hole_flutter/black_hole_flutter.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 /// Used by [PageTransitionsTheme] to define a horizontal [MaterialPageRoute]
 /// page transition animation that matches [SwipeablePageRoute].
@@ -113,12 +114,14 @@ class SwipeablePageRoute<T> extends CupertinoPageRoute<T> {
 
   /// An optional override for the [transitionDuration].
   final Duration? _transitionDuration;
+
   @override
   Duration get transitionDuration =>
       _transitionDuration ?? super.transitionDuration;
 
   /// An optional override for the [reverseTransitionDuration].
   final Duration? _reverseTransitionDuration;
+
   @override
   Duration get reverseTransitionDuration =>
       _reverseTransitionDuration ?? super.reverseTransitionDuration;
@@ -160,6 +163,7 @@ class SwipeablePageRoute<T> extends CupertinoPageRoute<T> {
 
   @override
   bool get popGestureEnabled => _isPopGestureEnabled(this, canSwipe);
+
   // Copied and modified from `CupertinoRouteTransitionMixin`
   static bool _isPopGestureEnabled<T>(PageRoute<T> route, bool canSwipe) {
     // If there's nothing to go back to, then obviously we don't support
@@ -270,8 +274,11 @@ class SwipeablePageRoute<T> extends CupertinoPageRoute<T> {
   }
 
   static bool _defaultCanSwipe() => true;
+
   static bool _defaultCanOnlySwipeFromEdge() => false;
+
   static double _defaultBackGestureDetectionWidth() => kMinInteractiveDimension;
+
   static double _defaultBackGestureDetectionStartOffset() => 0;
 }
 
@@ -364,6 +371,25 @@ class SwipeablePage<T> extends Page<T> {
   }
 }
 
+class SwipeableBackGestureDetector extends ChangeNotifier {
+  bool isDetecting = true;
+
+  void setDetection({required bool detection}) {
+    isDetecting = detection;
+    notifyListeners();
+  }
+
+  void reset() {
+    isDetecting = false;
+    notifyListeners();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      isDetecting = true;
+      notifyListeners();
+    });
+  }
+}
+
 extension BuildContextSwipeablePageRoute on BuildContext {
   SwipeablePageRoute<T>? getSwipeablePageRoute<T>() {
     final route = getModalRoute<T>();
@@ -412,6 +438,7 @@ class _FancyBackGestureDetector<T> extends StatefulWidget {
 class _FancyBackGestureDetectorState<T>
     extends State<_FancyBackGestureDetector<T>> {
   _CupertinoBackGestureController<T>? _backGestureController;
+
   @override
   Widget build(BuildContext context) {
     assert(debugCheckHasDirectionality(context));
@@ -432,9 +459,15 @@ class _FancyBackGestureDetectorState<T>
       },
     );
 
-    return Stack(
-      fit: StackFit.passthrough,
-      children: [widget.child, Positioned.fill(child: gestureDetector)],
+    return ChangeNotifierProvider(
+      create: (_) => SwipeableBackGestureDetector(),
+      child: Stack(
+        fit: StackFit.passthrough,
+        children: [
+          widget.child,
+          _BackDetector(child: gestureDetector),
+        ],
+      ),
     );
   }
 
@@ -500,6 +533,24 @@ class _FancyBackGestureDetectorState<T>
       TextDirection.rtl => context.mediaQuery.padding.right,
     };
     return math.max(dragAreaWidth, widget.backGestureDetectionWidth());
+  }
+}
+
+class _BackDetector extends StatelessWidget {
+  const _BackDetector({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<SwipeableBackGestureDetector>(
+      builder: (_, detector, child) {
+        return detector.isDetecting && child != null
+            ? child
+            : const SizedBox.shrink();
+      },
+      child: Positioned.fill(child: child),
+    );
   }
 }
 
