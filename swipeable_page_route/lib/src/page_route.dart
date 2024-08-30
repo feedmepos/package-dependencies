@@ -22,12 +22,17 @@ class SwipeablePageTransitionsBuilder extends PageTransitionsBuilder {
     this.backGestureDetectionWidth = kMinInteractiveDimension,
     this.backGestureDetectionStartOffset = 0,
     this.transitionBuilder,
+    this.gesture1Rect,
+    this.gesture2Rect,
   });
 
   final bool canOnlySwipeFromEdge;
   final double backGestureDetectionWidth;
   final double backGestureDetectionStartOffset;
   final SwipeableTransitionBuilder? transitionBuilder;
+
+  final Rect? gesture1Rect;
+  final Rect? gesture2Rect;
 
   @override
   Widget buildTransitions<T>(
@@ -47,6 +52,8 @@ class SwipeablePageTransitionsBuilder extends PageTransitionsBuilder {
       backGestureDetectionWidth: () => backGestureDetectionWidth,
       backGestureDetectionStartOffset: () => backGestureDetectionStartOffset,
       transitionBuilder: transitionBuilder,
+      gesture1Rect: gesture1Rect,
+      gesture2Rect: gesture2Rect,
     );
   }
 }
@@ -66,6 +73,8 @@ class SwipeablePageRoute<T> extends CupertinoPageRoute<T> {
     Duration? transitionDuration,
     Duration? reverseTransitionDuration,
     SwipeableTransitionBuilder? transitionBuilder,
+    this.gesture1Rect,
+    this.gesture2Rect,
     required super.builder,
     super.title,
     super.settings,
@@ -125,6 +134,9 @@ class SwipeablePageRoute<T> extends CupertinoPageRoute<T> {
   @override
   Duration get reverseTransitionDuration =>
       _reverseTransitionDuration ?? super.reverseTransitionDuration;
+
+  final Rect? gesture1Rect;
+  final Rect? gesture2Rect;
 
   /// {@template swipeable_page_route.SwipeablePageRoute.transitionBuilder}
   /// Custom builder to wrap the child widget.
@@ -229,6 +241,8 @@ class SwipeablePageRoute<T> extends CupertinoPageRoute<T> {
       backGestureDetectionWidth: () => backGestureDetectionWidth,
       backGestureDetectionStartOffset: () => backGestureDetectionStartOffset,
       transitionBuilder: transitionBuilder,
+      gesture1Rect: gesture1Rect,
+      gesture2Rect: gesture2Rect,
     );
   }
 
@@ -245,6 +259,8 @@ class SwipeablePageRoute<T> extends CupertinoPageRoute<T> {
     ValueGetter<double> backGestureDetectionStartOffset =
         _defaultBackGestureDetectionStartOffset,
     SwipeableTransitionBuilder? transitionBuilder,
+    Rect? gesture1Rect,
+    Rect? gesture2Rect,
   }) {
     final Widget wrappedChild;
     if (route.fullscreenDialog) {
@@ -259,6 +275,8 @@ class SwipeablePageRoute<T> extends CupertinoPageRoute<T> {
         canOnlySwipeFromEdge: canOnlySwipeFromEdge,
         backGestureDetectionWidth: backGestureDetectionWidth,
         backGestureDetectionStartOffset: backGestureDetectionStartOffset,
+        gesture1Rect: gesture1Rect,
+        gesture2Rect: gesture2Rect,
         child: child,
       );
     }
@@ -314,6 +332,8 @@ class SwipeablePage<T> extends Page<T> {
     this.maintainState = true,
     this.fullscreenDialog = false,
     this.allowSnapshotting = true,
+    this.gesture1Rect,
+    this.gesture2Rect,
     required this.builder,
   }) : transitionBuilder = transitionBuilder ??
             SwipeablePageRoute._defaultTransitionBuilder(fullscreenDialog);
@@ -348,6 +368,9 @@ class SwipeablePage<T> extends Page<T> {
   /// {@macro flutter.widgets.TransitionRoute.allowSnapshotting}
   final bool allowSnapshotting;
 
+  final Rect? gesture1Rect;
+  final Rect? gesture2Rect;
+
   /// The content to be shown in the [Route] created by this page.
   final WidgetBuilder builder;
 
@@ -367,12 +390,16 @@ class SwipeablePage<T> extends Page<T> {
       maintainState: maintainState,
       fullscreenDialog: fullscreenDialog,
       allowSnapshotting: allowSnapshotting,
+      gesture1Rect: gesture1Rect,
+      gesture2Rect: gesture2Rect,
     );
   }
 }
 
 class SwipeableBackGestureDetector extends ChangeNotifier {
   bool isDetecting = true;
+  Rect? gesture1Rect;
+  Rect? gesture2Rect;
 
   void setDetection({required bool detection}) {
     isDetecting = detection;
@@ -387,6 +414,12 @@ class SwipeableBackGestureDetector extends ChangeNotifier {
       isDetecting = true;
       notifyListeners();
     });
+  }
+
+  void updateGesturesPositionFromLRTB({Rect? gesture1Rect, Rect? gesture2Rect}) {
+    gesture1Rect = gesture1Rect;
+    gesture2Rect = gesture2Rect;
+    notifyListeners();
   }
 }
 
@@ -420,6 +453,8 @@ class _FancyBackGestureDetector<T> extends StatefulWidget {
     required this.enabledCallback,
     required this.onStartPopGesture,
     required this.child,
+    this.gesture1Rect,
+    this.gesture2Rect,
   });
 
   final ValueGetter<bool> canOnlySwipeFromEdge;
@@ -429,6 +464,9 @@ class _FancyBackGestureDetector<T> extends StatefulWidget {
   final Widget child;
   final ValueGetter<bool> enabledCallback;
   final ValueGetter<_CupertinoBackGestureController<T>> onStartPopGesture;
+
+  final Rect? gesture1Rect;
+  final Rect? gesture2Rect;
 
   @override
   _FancyBackGestureDetectorState<T> createState() =>
@@ -443,29 +481,21 @@ class _FancyBackGestureDetectorState<T>
   Widget build(BuildContext context) {
     assert(debugCheckHasDirectionality(context));
 
-    final gestureDetector = RawGestureDetector(
-      behavior: HitTestBehavior.translucent,
-      gestures: {
-        _DirectionDependentDragGestureRecognizer:
-            GestureRecognizerFactoryWithHandlers<
-                _DirectionDependentDragGestureRecognizer>(
-          _gestureRecognizerConstructor,
-          (instance) => instance
-            ..onStart = _handleDragStart
-            ..onUpdate = _handleDragUpdate
-            ..onEnd = _handleDragEnd
-            ..onCancel = _handleDragCancel,
-        ),
-      },
-    );
-
     return ChangeNotifierProvider(
       create: (_) => SwipeableBackGestureDetector(),
       child: Stack(
         fit: StackFit.passthrough,
         children: [
           widget.child,
-          _BackDetector(child: gestureDetector),
+          _BackDetector(
+            gestureRecognizer: _gestureRecognizerConstructor,
+            dragStart: _handleDragStart,
+            dragUpdate: _handleDragUpdate,
+            dragEnd: _handleDragEnd,
+            dragCancel: _handleDragCancel,
+            gesture1Rect: widget.gesture1Rect,
+            gesture2Rect: widget.gesture2Rect,
+          ),
         ],
       ),
     );
@@ -537,19 +567,73 @@ class _FancyBackGestureDetectorState<T>
 }
 
 class _BackDetector extends StatelessWidget {
-  const _BackDetector({required this.child});
+  const _BackDetector({
+    required this.gestureRecognizer,
+    required this.dragStart,
+    required this.dragUpdate,
+    required this.dragEnd,
+    required this.dragCancel,
+    this.gesture1Rect,
+    this.gesture2Rect,
+  });
 
-  final Widget child;
+  final _DirectionDependentDragGestureRecognizer Function() gestureRecognizer;
+  final void Function(DragStartDetails) dragStart;
+  final void Function(DragUpdateDetails) dragUpdate;
+  final void Function(DragEndDetails) dragEnd;
+  final VoidCallback dragCancel;
+  final Rect? gesture1Rect;
+  final Rect? gesture2Rect;
 
   @override
   Widget build(BuildContext context) {
+    final gestureDetector = RawGestureDetector(
+      behavior: HitTestBehavior.translucent,
+      gestures: {
+        _DirectionDependentDragGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<
+                _DirectionDependentDragGestureRecognizer>(
+          gestureRecognizer,
+          (instance) => instance
+            ..onStart = dragStart
+            ..onUpdate = dragUpdate
+            ..onEnd = dragEnd
+            ..onCancel = dragCancel,
+        ),
+      },
+    );
+
     return Consumer<SwipeableBackGestureDetector>(
       builder: (_, detector, child) {
+        final gesture1 = detector.gesture1Rect ?? gesture1Rect;
+        final gesture2 = detector.gesture2Rect ?? gesture2Rect;
         return detector.isDetecting && child != null
-            ? child
+            ? Stack(
+                fit: StackFit.passthrough,
+                children: [
+                  if (gesture1 == null && gesture2 == null)
+                    Positioned.fill(child: child),
+                  if (gesture1 != null)
+                    Positioned(
+                      bottom: gesture1.bottom,
+                      top: gesture1.top,
+                      left: gesture1.left,
+                      right: gesture1.right,
+                      child: child,
+                    ),
+                  if (gesture2 != null)
+                    Positioned(
+                      bottom: gesture2.bottom,
+                      top: gesture2.top,
+                      left: gesture2.left,
+                      right: gesture2.right,
+                      child: child,
+                    ),
+                ],
+              )
             : const SizedBox.shrink();
       },
-      child: Positioned.fill(child: child),
+      child: gestureDetector,
     );
   }
 }

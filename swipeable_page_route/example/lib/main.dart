@@ -75,8 +75,13 @@ class FirstPage extends StatelessWidget {
 
   Future<void> _pushSecondPage(BuildContext context) async {
     return switch (NavigationMode.current) {
-      NavigationMode.navigator => Navigator.of(context)
-          .push<void>(SwipeablePageRoute(builder: (_) => const SecondPage())),
+      NavigationMode.navigator => Navigator.of(context).push<void>(
+          SwipeablePageRoute(
+            builder: (_) => const SecondPage(),
+            gesture1Rect: const Rect.fromLTRB(0, 0, 0, 500),
+            gesture2Rect: const Rect.fromLTRB(0, 500, 0, 0),
+          ),
+        ),
       NavigationMode.goRouter => GoRouter.of(context).push<void>('/page2'),
       NavigationMode.goRouterBuilder => SecondPageRoute().push(context),
     };
@@ -148,11 +153,13 @@ class _SecondPageState extends State<SecondPage> {
                   },
                   child: const Text('Toggle'),
                 ),
-                Text('Can only swipe from edge: ${pageRoute.canOnlySwipeFromEdge}'),
+                Text(
+                  'Can only swipe from edge: ${pageRoute.canOnlySwipeFromEdge}',
+                ),
                 TextButton(
                   onPressed: () => setState(
-                        () => pageRoute.canOnlySwipeFromEdge =
-                    !pageRoute.canOnlySwipeFromEdge,
+                    () => pageRoute.canOnlySwipeFromEdge =
+                        !pageRoute.canOnlySwipeFromEdge,
                   ),
                   child: const Text('Toggle'),
                 ),
