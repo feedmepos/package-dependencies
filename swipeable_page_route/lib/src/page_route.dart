@@ -607,7 +607,6 @@ class _BackDetector extends StatelessWidget {
       builder: (_, detector, child) {
         final gesture1 = detector.gesture1Rect ?? gesture1Rect;
         final gesture2 = detector.gesture2Rect ?? gesture2Rect;
-        print('gesture1: $gesture1, gesture2: $gesture2');
         return detector.isDetecting && child != null
             ? Stack(
                 fit: StackFit.passthrough,
