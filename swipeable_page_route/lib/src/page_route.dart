@@ -428,6 +428,25 @@ extension BuildContextSwipeablePageRoute on BuildContext {
     final route = getModalRoute<T>();
     return route is SwipeablePageRoute<T> ? route : null;
   }
+
+  void removeThisWidgetFromSwipeBack() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final box = findRenderObject()! as RenderBox;
+      final y = box
+          .localToGlobal(Offset.zero)
+          .dy;
+      final gesture1Bottom = MediaQuery.of(this).size.height - y;
+      final gesture2Top = y + box.size.height;
+      final gestureProvider = read<SwipeableBackGestureDetector>();
+      if (gestureProvider.gesture1Rect?.bottom != gesture1Bottom ||
+          gestureProvider.gesture2Rect?.top != gesture2Top) {
+        gestureProvider.updateGesturesPositionFromLRTB(
+          gesture1Rect: Rect.fromLTRB(0, 0, 0, gesture1Bottom),
+          gesture2Rect: Rect.fromLTRB(0, gesture2Top, 0, 0),
+        );
+      }
+    });
+  }
 }
 
 // Mostly copies and modified variations of the private widgets related to
