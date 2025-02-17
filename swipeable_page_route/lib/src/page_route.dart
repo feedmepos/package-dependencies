@@ -431,7 +431,9 @@ extension BuildContextSwipeablePageRoute on BuildContext {
 
   void removeThisWidgetFromSwipeBack() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final box = findRenderObject()! as RenderBox;
+      final box = findRenderObject() as RenderBox?;
+      if (box == null) return;
+
       final y = box
           .localToGlobal(Offset.zero)
           .dy;
