@@ -133,7 +133,6 @@ extension Compress on IVideoCompress {
       compressProgress\$ stream to know the compressing state.''');
     }
 
-    // ignore: invalid_use_of_protected_member
     final jsonStr = await _invoke<String>('compressVideo', {
       'path': path,
       'quality': quality.index,
