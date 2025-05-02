@@ -101,13 +101,15 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
     required this.systemOverlayStyle,
     required this.forceMaterialTransparency,
     required this.clipBehavior,
+    required this.accessibleNavigation,
   })  : assert(primary || topPadding == 0.0),
         assert(
           !floating ||
               (snapConfiguration == null &&
                   showOnScreenConfiguration == null) ||
               vsync != null,
-          'vsync cannot be null when snapConfiguration or showOnScreenConfiguration is not null, and floating is true',
+          'vsync cannot be null when snapConfiguration or '
+          'showOnScreenConfiguration is not null, and floating is true',
         ),
         _bottomHeight = bottom?.preferredSize.height ?? 0;
 
@@ -146,6 +148,7 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   final bool forceMaterialTransparency;
   final Clip? clipBehavior;
   final double _bottomHeight;
+  final bool accessibleNavigation;
 
   @override
   double get minExtent => collapsedHeight;
@@ -187,18 +190,27 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
     final visibleToolbarHeight =
         visibleMainHeight - _bottomHeight - extraToolbarHeight;
 
+    final isScrolledUnder = overlapsContent ||
+        forceElevated ||
+        (pinned && shrinkOffset > maxExtent - minExtent);
     final isPinnedWithOpacityFade =
         pinned && floating && bottom != null && extraToolbarHeight == 0.0;
-    final toolbarOpacity = !pinned || isPinnedWithOpacityFade
-        ? (visibleToolbarHeight / (toolbarHeight ?? kToolbarHeight))
-            .clamp(0.0, 1.0)
-        : 1.0;
+    final toolbarOpacity =
+        !accessibleNavigation && (!pinned || isPinnedWithOpacityFade)
+            ? clampDouble(
+                visibleToolbarHeight / (toolbarHeight ?? kToolbarHeight),
+                0,
+                1,
+              )
+            : 1.0;
 
     final appBar = FlexibleSpaceBar.createSettings(
       minExtent: minExtent,
       maxExtent: maxExtent,
       currentExtent: math.max(minExtent, maxExtent - shrinkOffset),
       toolbarOpacity: toolbarOpacity,
+      isScrolledUnder: isScrolledUnder,
+      hasLeading: leading != null || automaticallyImplyLeading,
       child: MorphingAppBar(
         heroTag: heroTag,
         leading: leading,
@@ -210,11 +222,7 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
                 ? Semantics(header: true, child: flexibleSpace)
                 : flexibleSpace,
         bottom: bottom,
-        elevation: forceElevated ||
-                overlapsContent ||
-                (pinned && shrinkOffset > maxExtent - minExtent)
-            ? elevation ?? 4
-            : 0,
+        elevation: isScrolledUnder ? elevation : 0.0,
         scrolledUnderElevation: scrolledUnderElevation,
         shadowColor: shadowColor,
         surfaceTintColor: surfaceTintColor,
@@ -279,18 +287,22 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
         titleTextStyle != oldDelegate.titleTextStyle ||
         systemOverlayStyle != oldDelegate.systemOverlayStyle ||
         forceMaterialTransparency != oldDelegate.forceMaterialTransparency ||
-        clipBehavior != oldDelegate.clipBehavior;
+        clipBehavior != oldDelegate.clipBehavior ||
+        accessibleNavigation != oldDelegate.accessibleNavigation;
   }
 
   @override
   String toString() {
-    return '${describeIdentity(this)}(topPadding: ${topPadding.toStringAsFixed(1)}, bottomHeight: ${_bottomHeight.toStringAsFixed(1)}, ...)';
+    return '${describeIdentity(this)}('
+        'topPadding: ${topPadding.toStringAsFixed(1)}, '
+        'bottomHeight: ${_bottomHeight.toStringAsFixed(1)}, ...)';
   }
 }
 
 /// An adapted version of [SliverAppBar] that morphs while navigating.
 class MorphingSliverAppBar extends StatefulWidget {
-  /// Creates a material design app bar that can be placed in a [CustomScrollView].
+  /// Creates a Material Design app bar that can be placed in a
+  /// [CustomScrollView].
   ///
   /// The arguments [forceElevated], [primary], [floating], [pinned], [snap]
   /// and [automaticallyImplyLeading] must not be null.
@@ -339,7 +351,8 @@ class MorphingSliverAppBar extends StatefulWidget {
         assert(stretchTriggerOffset > 0.0),
         assert(
           collapsedHeight == null || collapsedHeight >= toolbarHeight,
-          'The "collapsedHeight" argument has to be larger than or equal to [toolbarHeight].',
+          'The "collapsedHeight" argument has to be larger than or equal to '
+          '[toolbarHeight].',
         );
 
   /// Tag used for the internally created [Hero] widget.
@@ -565,6 +578,7 @@ class _SliverAppBarState extends State<MorphingSliverAppBar>
           systemOverlayStyle: widget.systemOverlayStyle,
           forceMaterialTransparency: widget.forceMaterialTransparency,
           clipBehavior: widget.clipBehavior,
+          accessibleNavigation: MediaQuery.accessibleNavigationOf(context),
         ),
       ),
     );

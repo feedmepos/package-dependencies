@@ -7,7 +7,7 @@ import 'app_bar.dart';
 import 'state.dart';
 
 class AnimatedBottom extends AnimatedAppBarPart implements PreferredSizeWidget {
-  const AnimatedBottom(super.state);
+  const AnimatedBottom(super.state, {super.key});
 
   @override
   Size get preferredSize => Size.fromHeight(preferredHeight);
@@ -35,16 +35,18 @@ class AnimatedBottom extends AnimatedAppBarPart implements PreferredSizeWidget {
       // Do a simple crossfade.
       return SizedBox(
         height: preferredHeight,
-        child: Stack(children: [
-          Positioned.fill(
-            top: null,
-            child: Opacity(opacity: 1 - t, child: parent.appBar.bottom),
-          ),
-          Positioned.fill(
-            top: null,
-            child: Opacity(opacity: t, child: child.appBar.bottom),
-          ),
-        ]),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              top: null,
+              child: Opacity(opacity: 1 - t, child: parent.appBar.bottom),
+            ),
+            Positioned.fill(
+              top: null,
+              child: Opacity(opacity: t, child: child.appBar.bottom),
+            ),
+          ],
+        ),
       );
     }
 
@@ -60,18 +62,20 @@ class AnimatedBottom extends AnimatedAppBarPart implements PreferredSizeWidget {
           hasChild: hasChild,
         ),
         blendMode: BlendMode.dstOut,
-        child: Stack(children: [
-          if (hasParent && t < parentEnd)
-            Positioned.fill(
-              top: null,
-              child: Center(child: parent.appBar.bottom),
-            ),
-          if (hasChild && t > childStart)
-            Positioned.fill(
-              top: null,
-              child: Center(child: child.appBar.bottom),
-            ),
-        ]),
+        child: Stack(
+          children: [
+            if (hasParent && t < parentEnd)
+              Positioned.fill(
+                top: null,
+                child: Center(child: parent.appBar.bottom),
+              ),
+            if (hasChild && t > childStart)
+              Positioned.fill(
+                top: null,
+                child: Center(child: child.appBar.bottom),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -88,11 +92,11 @@ class AnimatedBottom extends AnimatedAppBarPart implements PreferredSizeWidget {
       end: Alignment.bottomCenter,
       colors: [
         if (hasParent && hasChild)
-          Colors.white.withOpacity(triangleT)
+          Colors.white.withValues(alpha: triangleT)
         else if (hasParent)
-          Colors.white.withOpacity(t)
+          Colors.white.withValues(alpha: t)
         else if (hasChild)
-          Colors.white.withOpacity(1 - t),
+          Colors.white.withValues(alpha: 1 - t),
         Colors.white.withAlpha(0),
       ],
       stops: [

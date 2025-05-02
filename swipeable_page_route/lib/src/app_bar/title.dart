@@ -10,7 +10,7 @@ import 'app_bar.dart';
 import 'state.dart';
 
 class AnimatedTitle extends MultiChildRenderObjectWidget {
-  AnimatedTitle(MorphingState state)
+  AnimatedTitle(MorphingState state, {super.key})
       : t = state.t,
         super(
           children: [_createChild(state.parent), _createChild(state.child)],
@@ -19,17 +19,19 @@ class AnimatedTitle extends MultiChildRenderObjectWidget {
   final double t;
 
   static Widget _createChild(EndState state) {
-    final title = state.appBar.title;
-    if (title == null) return const SizedBox();
-
     var style = state.titleTextStyle;
     if (style?.color != null) {
-      style = style!.copyWith(color: style.color!.withOpacity(state.opacity));
+      style = style!.copyWith(
+        color: style.color!.withValues(alpha: state.opacity),
+      );
     }
 
     return _AnimatedTitleParentDataWidget(
       hasLeading: state.leading != null,
-      child: DefaultTextStyle.merge(style: style, child: title),
+      child: DefaultTextStyle.merge(
+        style: style,
+        child: state.appBar.title ?? const SizedBox.shrink(),
+      ),
     );
   }
 
@@ -86,16 +88,16 @@ class _AnimatedTitleLayout
 
   @override
   double computeMinIntrinsicWidth(double height) =>
-      children.map((c) => c.getMinIntrinsicWidth(height)).max.toDouble();
+      children.map((c) => c.getMinIntrinsicWidth(height)).max;
   @override
   double computeMaxIntrinsicWidth(double height) =>
-      children.map((c) => c.getMaxIntrinsicWidth(height)).max.toDouble();
+      children.map((c) => c.getMaxIntrinsicWidth(height)).max;
   @override
   double computeMinIntrinsicHeight(double width) =>
-      children.map((c) => c.getMinIntrinsicHeight(width)).max.toDouble();
+      children.map((c) => c.getMinIntrinsicHeight(width)).max;
   @override
   double computeMaxIntrinsicHeight(double width) =>
-      children.map((c) => c.getMaxIntrinsicHeight(width)).max.toDouble();
+      children.map((c) => c.getMaxIntrinsicHeight(width)).max;
 
   @override
   bool get alwaysNeedsCompositing => true;
