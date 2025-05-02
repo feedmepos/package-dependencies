@@ -1,8 +1,6 @@
 {
   inputs = {
-    nixpkgs.url =
-      "github:nixos/nixpkgs?ref=a22a985f13d58b2bafb4964dd2bdf6376106a2d2";
-    # https://github.com/NixOS/nixpkgs/pull/311815
+    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -17,19 +15,19 @@
           };
         };
 
-        flutter = pkgs.flutterPackages.v3_22;
+        flutter = pkgs.flutterPackages.v3_27;
 
         # Android
         androidSdkArgs = {
-          buildToolsVersions = [ "30.0.3" ];
-          platformVersions = [ "34" ];
+          buildToolsVersions = [ "33.0.1" ];
+          platformVersions = [ "33" "34" "35" ];
         };
         androidComposition =
           pkgs.androidenv.composeAndroidPackages androidSdkArgs;
         androidSdk = androidComposition.androidsdk;
         androidEmulator = pkgs.androidenv.emulateApp {
           name = "Emulator";
-          platformVersion = "34";
+          platformVersion = "35";
           systemImageType = "google_apis_playstore";
           abiVersion = "x86_64";
           configOptions = {
