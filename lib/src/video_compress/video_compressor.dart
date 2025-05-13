@@ -111,6 +111,7 @@ extension Compress on IVideoCompress {
   /// you can choose its quality by [quality],
   /// determine whether to delete his source file by [deleteOrigin]
   /// optional parameters [startTime] [duration] [includeAudio] [frameRate]
+  /// optional parameters [kbps] kilobits per second
   ///
   /// ## example
   /// ```dart
@@ -128,6 +129,7 @@ extension Compress on IVideoCompress {
     int? duration,
     bool? includeAudio,
     int frameRate = 30,
+    int? kbps,
   }) async {
     if (isCompressing) {
       throw StateError('''VideoCompress Error: 
@@ -150,6 +152,7 @@ extension Compress on IVideoCompress {
       'duration': duration,
       'includeAudio': includeAudio,
       'frameRate': frameRate,
+      'kbps': kbps,
     });
 
     // ignore: invalid_use_of_protected_member

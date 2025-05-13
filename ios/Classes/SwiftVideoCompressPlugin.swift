@@ -42,8 +42,9 @@ public class SwiftVideoCompressPlugin: NSObject, FlutterPlugin {
             let duration = args!["duration"] as? Double
             let includeAudio = args!["includeAudio"] as? Bool
             let frameRate = args!["frameRate"] as? Int
+            let kbps = args!["kbps"] as? Int
             compressVideo(path, quality, deleteOrigin, startTime, duration, includeAudio,
-                          frameRate, result)
+                          frameRate, kbps, result)
         case "cancelCompression":
             cancelCompression(result)
         case "deleteAllCache":
@@ -163,6 +164,7 @@ public class SwiftVideoCompressPlugin: NSObject, FlutterPlugin {
     
     private func getComposition(_ isIncludeAudio: Bool,_ timeRange: CMTimeRange, _ sourceVideoTrack: AVAssetTrack)->AVAsset {
         let composition = AVMutableComposition()
+        let videoComposition = AVMutableVideoComposition();
         if !isIncludeAudio {
             let compressionVideoTrack = composition.addMutableTrack(withMediaType: AVMediaType.video, preferredTrackID: kCMPersistentTrackID_Invalid)
             compressionVideoTrack!.preferredTransform = sourceVideoTrack.preferredTransform
@@ -175,7 +177,7 @@ public class SwiftVideoCompressPlugin: NSObject, FlutterPlugin {
     }
     
     private func compressVideo(_ path: String,_ quality: NSNumber,_ deleteOrigin: Bool,_ startTime: Double?,
-                               _ duration: Double?,_ includeAudio: Bool?,_ frameRate: Int?,
+                               _ duration: Double?,_ includeAudio: Bool?,_ frameRate: Int?, _ kbps: Int?,
                                _ result: @escaping FlutterResult) {
         let sourceVideoUrl = Utility.getPathUrl(path)
         let sourceVideoType = "mp4"
@@ -207,9 +209,13 @@ public class SwiftVideoCompressPlugin: NSObject, FlutterPlugin {
         exporter.outputURL = compressionUrl
         exporter.outputFileType = AVFileType.mp4
         exporter.shouldOptimizeForNetworkUse = true
+        if let kbps {
+            // 1k bit = 125 bytes
+            exporter.fileLengthLimit = Int64(Int(minDuration) * kbps * 125)
+        }
         
         if frameRate != nil {
-            let videoComposition = AVMutableVideoComposition(propertiesOf: sourceVideoAsset)
+            let videoComposition = AVMutableVideoComposition(propertiesOf: session)
             videoComposition.frameDuration = CMTimeMake(value: 1, timescale: Int32(frameRate!))
             exporter.videoComposition = videoComposition
         }
