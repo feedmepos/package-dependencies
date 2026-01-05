@@ -1,0 +1,87 @@
+{
+  "files": [
+    "README.md"
+  ],
+  "imageSize": 100,
+  "commit": false,
+  "contributors": [
+    {
+      "login": "khainhero",
+      "name": "khainhero",
+      "avatar_url": "https://avatars1.githubusercontent.com/u/42075898?v=4",
+      "profile": "http://projectmeet.app",
+      "contributions": [
+        "maintenance"
+      ]
+    },
+    {
+      "login": "Serdnad",
+      "name": "Andres Gutierrez",
+      "avatar_url": "https://avatars1.githubusercontent.com/u/4723453?v=4",
+      "profile": "https://github.com/Serdnad",
+      "contributions": [
+        "maintenance"
+      ]
+    },
+    {
+      "login": "jonataslaw",
+      "name": "Jonny Borges",
+      "avatar_url": "https://avatars2.githubusercontent.com/u/35742643?v=4",
+      "profile": "https://github.com/jonataslaw",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "Martibis",
+      "name": "Tibout Shaik",
+      "avatar_url": "https://avatars0.githubusercontent.com/u/13279066?v=4",
+      "profile": "http://www.tiboutshaik.com",
+      "contributions": [
+        "maintenance"
+      ]
+    },
+    {
+      "login": "marcobraghim",
+      "name": "Marco A. Braghim",
+      "avatar_url": "https://avatars3.githubusercontent.com/u/2068045?v=4",
+      "profile": "https://www.thizer.com",
+      "contributions": [
+        "maintenance"
+      ]
+    },
+    {
+      "login": "ppornkitpras-agoda",
+      "name": "ppornkitpras-agoda",
+      "avatar_url": "https://avatars3.githubusercontent.com/u/54128106?v=4",
+      "profile": "https://github.com/ppornkitpras-agoda",
+      "contributions": [
+        "maintenance"
+      ]
+    },
+    {
+      "login": "snowb1shop",
+      "name": "Rafał Płonka",
+      "avatar_url": "https://avatars3.githubusercontent.com/u/18536122?v=4",
+      "profile": "https://github.com/snowb1shop",
+      "contributions": [
+        "maintenance"
+      ]
+    },
+    {
+      "login": "yanivshaked",
+      "name": "Yaniv Shaked",
+      "avatar_url": "https://avatars3.githubusercontent.com/u/13107481?v=4",
+      "profile": "https://github.com/yanivshaked",
+      "contributions": [
+        "maintenance"
+      ]
+    }
+  ],
+  "contributorsPerLine": 7,
+  "projectName": "VideoCompress",
+  "projectOwner": "jonataslaw",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "skipCi": true
+}
