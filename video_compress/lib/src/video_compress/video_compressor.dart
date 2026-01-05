@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -111,6 +110,7 @@ extension Compress on IVideoCompress {
   /// you can choose its quality by [quality],
   /// determine whether to delete his source file by [deleteOrigin]
   /// optional parameters [startTime] [duration] [includeAudio] [frameRate]
+  /// optional parameters [kbps] kilobits per second
   ///
   /// ## example
   /// ```dart
@@ -128,20 +128,13 @@ extension Compress on IVideoCompress {
     int? duration,
     bool? includeAudio,
     int frameRate = 30,
+    int? kbps,
   }) async {
-    if (isCompressing) {
-      throw StateError('''VideoCompress Error: 
-      Method: compressVideo
-      Already have a compression process, you need to wait for the process to finish or stop it''');
-    }
-
     if (compressProgress$.notSubscribed) {
       debugPrint('''VideoCompress: You can try to subscribe to the 
       compressProgress\$ stream to know the compressing state.''');
     }
 
-    // ignore: invalid_use_of_protected_member
-    setProcessingStatus(true);
     final jsonStr = await _invoke<String>('compressVideo', {
       'path': path,
       'quality': quality.index,
@@ -150,10 +143,8 @@ extension Compress on IVideoCompress {
       'duration': duration,
       'includeAudio': includeAudio,
       'frameRate': frameRate,
+      'kbps': kbps,
     });
-
-    // ignore: invalid_use_of_protected_member
-    setProcessingStatus(false);
 
     if (jsonStr != null) {
       final jsonMap = json.decode(jsonStr);

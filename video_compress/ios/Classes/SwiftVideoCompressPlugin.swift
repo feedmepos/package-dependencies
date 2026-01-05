@@ -42,8 +42,9 @@ public class SwiftVideoCompressPlugin: NSObject, FlutterPlugin {
             let duration = args!["duration"] as? Double
             let includeAudio = args!["includeAudio"] as? Bool
             let frameRate = args!["frameRate"] as? Int
+            let kbps = args!["kbps"] as? Int
             compressVideo(path, quality, deleteOrigin, startTime, duration, includeAudio,
-                          frameRate, result)
+                          frameRate, kbps, result)
         case "cancelCompression":
             cancelCompression(result)
         case "deleteAllCache":
@@ -163,6 +164,7 @@ public class SwiftVideoCompressPlugin: NSObject, FlutterPlugin {
     
     private func getComposition(_ isIncludeAudio: Bool,_ timeRange: CMTimeRange, _ sourceVideoTrack: AVAssetTrack)->AVAsset {
         let composition = AVMutableComposition()
+        let videoComposition = AVMutableVideoComposition();
         if !isIncludeAudio {
             let compressionVideoTrack = composition.addMutableTrack(withMediaType: AVMediaType.video, preferredTrackID: kCMPersistentTrackID_Invalid)
             compressionVideoTrack!.preferredTransform = sourceVideoTrack.preferredTransform
@@ -171,11 +173,29 @@ public class SwiftVideoCompressPlugin: NSObject, FlutterPlugin {
             return sourceVideoTrack.asset!
         }
         
-        return composition    
+        return composition
+    }
+    
+    private func getVideoAdjustedSize(_ sourceVideoTrack: AVAssetTrack) -> CGSize {
+        var transform = sourceVideoTrack.preferredTransform
+        var adjustedSize = sourceVideoTrack.naturalSize.applying(transform)
+        adjustedSize.width = abs(adjustedSize.width)
+        adjustedSize.height = abs(adjustedSize.height)
+        return adjustedSize
+    }
+    
+    private func getVideoTransform(videoTrack sourceVideoTrack: AVAssetTrack, videoSize: CGSize) -> CGAffineTransform {
+        var transform = sourceVideoTrack.preferredTransform
+        if avController.isVideoRotatedToPortraitUp(sourceVideoTrack) {
+            transform.tx = videoSize.width
+        } else if avController.isVideoRotatedToPortraitUpsideDown(sourceVideoTrack) {
+            transform.ty = videoSize.height
+        }
+        return transform
     }
     
     private func compressVideo(_ path: String,_ quality: NSNumber,_ deleteOrigin: Bool,_ startTime: Double?,
-                               _ duration: Double?,_ includeAudio: Bool?,_ frameRate: Int?,
+                               _ duration: Double?,_ includeAudio: Bool?,_ frameRate: Int?, _ kbps: Int?,
                                _ result: @escaping FlutterResult) {
         let sourceVideoUrl = Utility.getPathUrl(path)
         let sourceVideoType = "mp4"
@@ -188,10 +208,10 @@ public class SwiftVideoCompressPlugin: NSObject, FlutterPlugin {
         Utility.getPathUrl("\(Utility.basePath())/\(Utility.getFileName(path))\(uuid.uuidString).\(sourceVideoType)")
 
         let timescale = sourceVideoAsset.duration.timescale
-        let minStartTime = Double(startTime ?? 0)
+        let minStartTime = Double(startTime ?? 0) / 1000.0
         
         let videoDuration = sourceVideoAsset.duration.seconds
-        let minDuration = Double(duration ?? videoDuration)
+        let minDuration = Double(duration != nil ? ((duration ?? 0) / 1000.0) : videoDuration)
         let maxDurationTime = minStartTime + minDuration < videoDuration ? minDuration : videoDuration
         
         let cmStartTime = CMTimeMakeWithSeconds(minStartTime, preferredTimescale: timescale)
@@ -207,10 +227,30 @@ public class SwiftVideoCompressPlugin: NSObject, FlutterPlugin {
         exporter.outputURL = compressionUrl
         exporter.outputFileType = AVFileType.mp4
         exporter.shouldOptimizeForNetworkUse = true
+        if let kbps {
+            // 1k bit = 125 bytes
+            exporter.fileLengthLimit = Int64(Int(minDuration) * kbps * 125)
+        }
         
         if frameRate != nil {
-            let videoComposition = AVMutableVideoComposition(propertiesOf: sourceVideoAsset)
+            let videoComposition = AVMutableVideoComposition(propertiesOf: session)
             videoComposition.frameDuration = CMTimeMake(value: 1, timescale: Int32(frameRate!))
+            if let sourceVideoTrack {
+                let adjustedSize = getVideoAdjustedSize(sourceVideoTrack)
+                videoComposition.renderSize = adjustedSize
+                
+                let transform = getVideoTransform(videoTrack: sourceVideoTrack, videoSize: adjustedSize)
+                
+                let instruction = AVMutableVideoCompositionInstruction()
+                instruction.timeRange = CMTimeRange(start: .zero, duration: sourceVideoAsset.duration)
+                
+                let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: sourceVideoTrack)
+                
+                layerInstruction.setTransform(transform, at: .zero)
+                
+                instruction.layerInstructions = [layerInstruction]
+                videoComposition.instructions = [instruction]
+            }
             exporter.videoComposition = videoComposition
         }
         
