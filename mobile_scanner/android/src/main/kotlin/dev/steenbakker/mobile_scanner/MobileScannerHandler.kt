@@ -159,6 +159,7 @@ class MobileScannerHandler(
             "resetScale" -> resetScale(result)
             "updateScanWindow" -> updateScanWindow(call, result)
             "setFocus" -> setFocus(call, result)
+            "takePicture" -> takePicture(result)
             else -> result.notImplemented()
         }
     }
@@ -429,6 +430,57 @@ class MobileScannerHandler(
                 e.localizedMessage
             )
         }
+    }
+
+    private fun takePicture(result: MethodChannel.Result) {
+        mobileScanner?.takePicture(
+            onSuccess = {
+                Handler(Looper.getMainLooper()).post {
+                    result.success(it)
+                }
+            },
+            onError = {
+                Handler(Looper.getMainLooper()).post {
+                    when (it) {
+                        is ImageCaptureNotAvailable -> {
+                            result.error(
+                                MobileScannerErrorCodes.IMAGE_CAPTURE_NOT_AVAILABLE_ERROR,
+                                MobileScannerErrorCodes.IMAGE_CAPTURE_NOT_AVAILABLE_ERROR_MESSAGE,
+                                null
+                            )
+                        }
+                        is ImageCaptureReadError -> {
+                            result.error(
+                                MobileScannerErrorCodes.IMAGE_CAPTURE_READ_ERROR,
+                                MobileScannerErrorCodes.IMAGE_CAPTURE_READ_ERROR_MESSAGE,
+                                null
+                            )
+                        }
+                        is ImageCaptureProcessError -> {
+                            result.error(
+                                MobileScannerErrorCodes.IMAGE_CAPTURE_PROCESS_ERROR,
+                                MobileScannerErrorCodes.IMAGE_CAPTURE_PROCESS_ERROR_MESSAGE,
+                                null
+                            )
+                        }
+                        is ImageCaptureFailed -> {
+                            result.error(
+                                MobileScannerErrorCodes.IMAGE_CAPTURE_FAILED_ERROR,
+                                MobileScannerErrorCodes.IMAGE_CAPTURE_FAILED_ERROR_MESSAGE,
+                                null
+                            )
+                        }
+                        else -> {
+                            result.error(
+                                MobileScannerErrorCodes.GENERIC_ERROR,
+                                MobileScannerErrorCodes.GENERIC_ERROR_MESSAGE,
+                                null
+                            )
+                        }
+                    }
+                }
+            }
+        )
     }
 
 }

@@ -305,6 +305,25 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
     return MobileScannerPlatform.instance.buildCameraView();
   }
 
+  /// Take a picture with the active camera and return the image bytes.
+  ///
+  /// Throws a [MobileScannerException] if the controller is not initialized
+  /// or the camera is not running.
+  Future<Uint8List> takePicture() async {
+    _throwIfNotInitialized();
+
+    if (!value.isRunning) {
+      throw const MobileScannerException(
+        errorCode: MobileScannerErrorCode.genericError,
+        errorDetails: MobileScannerErrorDetails(
+          message: 'Camera is not running. Cannot take picture.',
+        ),
+      );
+    }
+
+    return MobileScannerPlatform.instance.takePicture();
+  }
+
   /// Reset the zoom scale of the camera.
   ///
   /// Does nothing if the camera is not running.
