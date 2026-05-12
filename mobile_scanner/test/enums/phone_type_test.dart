@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_scanner/src/enums/phone_type.dart';
 
 void main() {
-  group('$PhoneType tests', () {
+  group('PhoneType tests', () {
     test('can be created from raw value', () {
       const values = <int, PhoneType>{
         0: PhoneType.unknown,
@@ -12,16 +12,16 @@ void main() {
         4: PhoneType.mobile,
       };
 
-      for (final MapEntry<int, PhoneType> entry in values.entries) {
-        final PhoneType result = PhoneType.fromRawValue(entry.key);
+      for (final entry in values.entries) {
+        final result = PhoneType.fromRawValue(entry.key);
 
         expect(result, entry.value);
       }
     });
 
     test('invalid raw value returns PhoneType.unknown', () {
-      const int negative = -1;
-      const int outOfRange = 5;
+      const negative = -1;
+      const outOfRange = 5;
 
       expect(PhoneType.fromRawValue(negative), PhoneType.unknown);
       expect(PhoneType.fromRawValue(outOfRange), PhoneType.unknown);
@@ -36,8 +36,8 @@ void main() {
         PhoneType.mobile: 4,
       };
 
-      for (final MapEntry<PhoneType, int> entry in values.entries) {
-        final int result = entry.key.rawValue;
+      for (final entry in values.entries) {
+        final result = entry.key.rawValue;
 
         expect(result, entry.value);
       }

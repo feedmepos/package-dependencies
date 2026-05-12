@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_scanner/src/enums/barcode_type.dart';
 
 void main() {
-  group('$BarcodeType tests', () {
+  group('BarcodeType tests', () {
     test('can be created from raw value', () {
       const values = <int, BarcodeType>{
         0: BarcodeType.unknown,
@@ -20,16 +20,16 @@ void main() {
         12: BarcodeType.driverLicense,
       };
 
-      for (final MapEntry<int, BarcodeType> entry in values.entries) {
-        final BarcodeType result = BarcodeType.fromRawValue(entry.key);
+      for (final entry in values.entries) {
+        final result = BarcodeType.fromRawValue(entry.key);
 
         expect(result, entry.value);
       }
     });
 
     test('invalid raw value returns BarcodeType.unknown', () {
-      const int negative = -1;
-      const int outOfRange = 13;
+      const negative = -1;
+      const outOfRange = 13;
 
       expect(BarcodeType.fromRawValue(negative), BarcodeType.unknown);
       expect(BarcodeType.fromRawValue(outOfRange), BarcodeType.unknown);
@@ -52,8 +52,8 @@ void main() {
         BarcodeType.driverLicense: 12,
       };
 
-      for (final MapEntry<BarcodeType, int> entry in values.entries) {
-        final int result = entry.key.rawValue;
+      for (final entry in values.entries) {
+        final result = entry.key.rawValue;
 
         expect(result, entry.value);
       }

@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:mobile_scanner/src/enums/barcode_format.dart';
 import 'package:mobile_scanner/src/enums/camera_facing.dart';
+import 'package:mobile_scanner/src/enums/camera_lens_type.dart';
 import 'package:mobile_scanner/src/enums/detection_speed.dart';
 
 /// This class defines the different start options for the mobile scanner.
@@ -9,6 +10,7 @@ class StartOptions {
   /// Construct a new [StartOptions] instance.
   const StartOptions({
     required this.cameraDirection,
+    required this.cameraLensType,
     required this.cameraResolution,
     required this.detectionSpeed,
     required this.detectionTimeoutMs,
@@ -25,6 +27,15 @@ class StartOptions {
 
   /// The desired camera resolution for the scanner.
   final Size? cameraResolution;
+
+  /// The preferred lens type for the camera.
+  ///
+  /// This allows selection between normal, wide, and zoom lenses on devices
+  /// with multiple cameras.
+  ///
+  /// When set to [CameraLensType.any], the first available camera for the
+  /// given [cameraDirection] will be used.
+  final CameraLensType cameraLensType;
 
   /// Invert image colors for analyzer to support white-on-black barcodes, which
   /// are not supported by MLKit.
@@ -66,6 +77,7 @@ class StartOptions {
           cameraResolution!.height.toInt(),
         ],
       'facing': cameraDirection.rawValue,
+      'lensType': cameraLensType.rawValue,
       if (formats.isNotEmpty)
         'formats': formats.map((f) => f.rawValue).toList(),
       'returnImage': returnImage,

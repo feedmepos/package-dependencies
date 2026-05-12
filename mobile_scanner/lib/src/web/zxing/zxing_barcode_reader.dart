@@ -41,7 +41,7 @@ final class ZXingBarcodeReader extends BarcodeReader {
 
   @override
   Size get videoSize {
-    final web.HTMLVideoElement? videoElement = _reader?.videoElement;
+    final videoElement = _reader?.videoElement;
 
     if (videoElement == null) {
       return Size.zero;
@@ -64,7 +64,7 @@ final class ZXingBarcodeReader extends BarcodeReader {
       return null;
     }
 
-    final JSMap hints =
+    final hints =
         JSMap()
           // Set the formats hint.
           // See https://github.com/zxing-js/library/blob/master/src/core/DecodeHintType.ts#L45
@@ -86,7 +86,7 @@ final class ZXingBarcodeReader extends BarcodeReader {
     web.HTMLVideoElement videoElement,
     web.MediaStream videoStream,
   ) async {
-    final JSPromise? result =
+    final result =
         _reader?.attachStreamToVideo.callAsFunction(
               _reader,
               videoStream,
@@ -96,8 +96,7 @@ final class ZXingBarcodeReader extends BarcodeReader {
 
     await result?.toDart;
 
-    final web.MediaTrackSettings? settings = _mediaTrackConstraintsDelegate
-        .getSettings(videoStream);
+    final settings = _mediaTrackConstraintsDelegate.getSettings(videoStream);
 
     if (settings != null) {
       _onMediaTrackSettingsChanged?.call(settings);
@@ -158,8 +157,8 @@ final class ZXingBarcodeReader extends BarcodeReader {
     required web.HTMLVideoElement videoElement,
     required web.MediaStream videoStream,
   }) async {
-    final int detectionTimeoutMs = options.detectionTimeoutMs;
-    final List<BarcodeFormat> formats = [
+    final detectionTimeoutMs = options.detectionTimeoutMs;
+    final formats = <BarcodeFormat>[
       for (final BarcodeFormat format in options.formats)
         if (format != BarcodeFormat.unknown) format,
     ];
@@ -180,7 +179,7 @@ final class ZXingBarcodeReader extends BarcodeReader {
 
   @override
   Future<void> resume() async {
-    final JSPromise<JSAny?>? result = _reader?.videoElement?.play();
+    final result = _reader?.videoElement?.play();
     await result?.toDart;
   }
 
@@ -195,8 +194,10 @@ final class ZXingBarcodeReader extends BarcodeReader {
 
 extension on BarcodeFormat {
   /// Get the barcode format from the ZXing library.
+  ///
+  /// See https://github.com/zxing-js/library/blob/master/src/core/BarcodeFormat.ts
   JSNumber get toJS {
-    final int zxingFormat = switch (this) {
+    final zxingFormat = switch (this) {
       BarcodeFormat.aztec => 0,
       BarcodeFormat.codabar => 1,
       BarcodeFormat.code39 => 2,
@@ -205,7 +206,9 @@ extension on BarcodeFormat {
       BarcodeFormat.dataMatrix => 5,
       BarcodeFormat.ean8 => 6,
       BarcodeFormat.ean13 => 7,
-      BarcodeFormat.itf => 8,
+      // ITF 2 of 5 is not supported by ZXing.
+      BarcodeFormat.itf2of5 || BarcodeFormat.itf2of5WithChecksum => 8,
+      BarcodeFormat.itf || BarcodeFormat.itf14 => 8,
       BarcodeFormat.pdf417 => 10,
       BarcodeFormat.qrCode => 11,
       BarcodeFormat.upcA => 14,

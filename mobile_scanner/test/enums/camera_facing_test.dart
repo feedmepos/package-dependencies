@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_scanner/src/enums/camera_facing.dart';
 
 void main() {
-  group('$CameraFacing tests', () {
+  group('CameraFacing tests', () {
     test('can be created from raw value', () {
       const values = <int?, CameraFacing>{
         null: CameraFacing.unknown,
@@ -12,16 +12,16 @@ void main() {
         -1: CameraFacing.unknown,
       };
 
-      for (final MapEntry<int?, CameraFacing> entry in values.entries) {
-        final CameraFacing result = CameraFacing.fromRawValue(entry.key);
+      for (final entry in values.entries) {
+        final result = CameraFacing.fromRawValue(entry.key);
 
         expect(result, entry.value);
       }
     });
 
     test('invalid raw value returns unknown', () {
-      const int negative = -10;
-      const int outOfRange = 3;
+      const negative = -10;
+      const outOfRange = 3;
 
       expect(CameraFacing.fromRawValue(negative), CameraFacing.unknown);
       expect(CameraFacing.fromRawValue(outOfRange), CameraFacing.unknown);
@@ -35,8 +35,8 @@ void main() {
         CameraFacing.unknown: -1,
       };
 
-      for (final MapEntry<CameraFacing, int> entry in values.entries) {
-        final int result = entry.key.rawValue;
+      for (final entry in values.entries) {
+        final result = entry.key.rawValue;
 
         expect(result, entry.value);
       }

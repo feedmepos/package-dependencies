@@ -12,7 +12,7 @@ final class MediaTrackConstraintsDelegate {
 
   /// Get the camera direction from the given [videoStream].
   CameraFacing getCameraDirection(MediaStream? videoStream) {
-    final MediaTrackSettings? trackSettings = getSettings(videoStream);
+    final trackSettings = getSettings(videoStream);
 
     return switch (trackSettings?.facingModeNullable) {
       'environment' => CameraFacing.back,
@@ -34,15 +34,15 @@ final class MediaTrackConstraintsDelegate {
 
   /// Get the settings for the given [mediaStream].
   MediaTrackSettings? getSettings(MediaStream? mediaStream) {
-    final List<MediaStreamTrack>? tracks = mediaStream?.getVideoTracks().toDart;
+    final tracks = mediaStream?.getVideoTracks().toDart;
 
     if (tracks == null || tracks.isEmpty) {
       return null;
     }
 
-    final MediaStreamTrack track = tracks.first;
+    final track = tracks.first;
 
-    final MediaTrackSettings settings = track.getSettings();
+    final settings = track.getSettings();
 
     if (settings.facingModeNullable == null) {
       return MediaTrackSettings(width: settings.width, height: settings.height);

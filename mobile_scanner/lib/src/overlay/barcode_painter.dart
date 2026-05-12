@@ -1,6 +1,27 @@
 import 'dart:math' as math;
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:mobile_scanner/src/utils/scan_window_utils.dart';
+
+/// Calculate the scaling ratios for width and height to fit the provided
+/// [cameraPreviewSize] into the specified [size],
+/// based on the specified [boxFit].
+///
+/// Returns a record containing the width and height scaling ratios.
+@Deprecated('Use ScanWindowUtils.calculateBoxFitRatio instead.')
+({double widthRatio, double heightRatio}) calculateBoxFitRatio(
+  BoxFit boxFit,
+  Size cameraPreviewSize,
+  Size size,
+) {
+  // TODO(navaronbracke): remove the deprecated method in the next release
+  return ScanWindowUtils.calculateBoxFitRatio(
+    boxFit: boxFit,
+    cameraPreviewSize: cameraPreviewSize,
+    size: size,
+  );
+}
 
 /// A [CustomPainter] that draws the barcode as an outlined barcode box with
 /// rounded corners and a displayed value.
@@ -15,6 +36,7 @@ class BarcodePainter extends CustomPainter {
     required this.color,
     required this.style,
     required this.textPainter,
+    required this.deviceOrientation,
     this.strokeWidth = 4.0,
   });
 
@@ -45,6 +67,9 @@ class BarcodePainter extends CustomPainter {
   /// The width of the border.
   final double strokeWidth;
 
+  /// The orientation of the device.
+  final DeviceOrientation deviceOrientation;
+
   @override
   void paint(Canvas canvas, Size size) {
     if (barcodeCorners.length < 4 ||
@@ -53,15 +78,26 @@ class BarcodePainter extends CustomPainter {
       return;
     }
 
-    final ({double heightRatio, double widthRatio}) ratios =
-        calculateBoxFitRatio(boxFit, cameraPreviewSize, size);
+    final isLandscape =
+        deviceOrientation == DeviceOrientation.landscapeLeft ||
+        deviceOrientation == DeviceOrientation.landscapeRight;
 
-    final double horizontalPadding =
-        (cameraPreviewSize.width * ratios.widthRatio - size.width) / 2;
-    final double verticalPadding =
-        (cameraPreviewSize.height * ratios.heightRatio - size.height) / 2;
+    final adjustedCameraPreviewSize =
+        isLandscape ? cameraPreviewSize.flipped : cameraPreviewSize;
 
-    final List<Offset> adjustedOffset = [
+    final ratios = ScanWindowUtils.calculateBoxFitRatio(
+      boxFit: boxFit,
+      cameraPreviewSize: adjustedCameraPreviewSize,
+      size: size,
+    );
+
+    final horizontalPadding =
+        (adjustedCameraPreviewSize.width * ratios.widthRatio - size.width) / 2;
+    final verticalPadding =
+        (adjustedCameraPreviewSize.height * ratios.heightRatio - size.height) /
+        2;
+
+    final adjustedOffset = <Offset>[
       for (final offset in barcodeCorners)
         Offset(
           offset.dx * ratios.widthRatio - horizontalPadding,
@@ -72,7 +108,7 @@ class BarcodePainter extends CustomPainter {
     if (adjustedOffset.length < 4) return;
 
     // Draw the rotated rectangle
-    final Path path = Path()..addPolygon(adjustedOffset, true);
+    final path = Path()..addPolygon(adjustedOffset, true);
 
     final paint =
         Paint()
@@ -83,23 +119,23 @@ class BarcodePainter extends CustomPainter {
     canvas.drawPath(path, paint);
 
     // Find center point of the barcode
-    final double centerX = (adjustedOffset[0].dx + adjustedOffset[2].dx) / 2;
-    final double centerY = (adjustedOffset[0].dy + adjustedOffset[2].dy) / 2;
-    final Offset center = Offset(centerX, centerY);
+    final centerX = (adjustedOffset[0].dx + adjustedOffset[2].dx) / 2;
+    final centerY = (adjustedOffset[0].dy + adjustedOffset[2].dy) / 2;
+    final center = Offset(centerX, centerY);
 
     // Calculate rotation angle
-    final double angle = math.atan2(
+    final angle = math.atan2(
       adjustedOffset[1].dy - adjustedOffset[0].dy,
       adjustedOffset[1].dx - adjustedOffset[0].dx,
     );
 
     // Set a smaller font size with auto-resizing logic
-    final double textSize =
+    final textSize =
         (barcodeSize.width * ratios.widthRatio) *
         0.08; // Scales with barcode size
     const double minTextSize = 6; // Minimum readable size
     const double maxTextSize = 12; // Maximum size
-    final double finalTextSize = textSize.clamp(minTextSize, maxTextSize);
+    final finalTextSize = textSize.clamp(minTextSize, maxTextSize);
 
     // Draw barcode value inside the overlay with rotation
     final textSpan = TextSpan(
@@ -114,8 +150,8 @@ class BarcodePainter extends CustomPainter {
     textPainter.text = textSpan;
     textPainter.layout(maxWidth: barcodeSize.width * ratios.widthRatio * 0.6);
 
-    final double textWidth = textPainter.width;
-    final double textHeight = textPainter.height;
+    final textWidth = textPainter.width;
+    final textHeight = textPainter.height;
 
     canvas
       ..save()
@@ -123,13 +159,13 @@ class BarcodePainter extends CustomPainter {
       ..rotate(angle) // Rotate the text to match the barcode
       ..translate(-center.dx, -center.dy);
 
-    final Rect textRect = Rect.fromCenter(
+    final textRect = Rect.fromCenter(
       center: center,
       width: textWidth * 1.1,
       height: textHeight * 1.1,
     );
 
-    final RRect textBackground = RRect.fromRectAndRadius(
+    final textBackground = RRect.fromRectAndRadius(
       textRect,
       const Radius.circular(6),
     );
@@ -147,7 +183,7 @@ class BarcodePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(BarcodePainter oldDelegate) {
-    const ListEquality<Offset> listEquality = ListEquality<Offset>();
+    const listEquality = ListEquality<Offset>();
 
     return !listEquality.equals(oldDelegate.barcodeCorners, barcodeCorners) ||
         oldDelegate.barcodeSize != barcodeSize ||
@@ -155,64 +191,7 @@ class BarcodePainter extends CustomPainter {
         oldDelegate.cameraPreviewSize != cameraPreviewSize ||
         oldDelegate.color != color ||
         oldDelegate.style != style ||
-        oldDelegate.barcodeValue != barcodeValue;
-  }
-}
-
-/// Calculate the scaling ratios for width and height to fit the small box
-/// (cameraPreviewSize) into the large box (size) based on the specified BoxFit
-/// mode. Returns a record containing the width and height scaling ratios.
-({double widthRatio, double heightRatio}) calculateBoxFitRatio(
-  BoxFit boxFit,
-  Size cameraPreviewSize,
-  Size size,
-) {
-  // If the width or height of cameraPreviewSize or size is 0, return (1.0, 1.0)
-  // (no scaling)
-  if (cameraPreviewSize.width <= 0 ||
-      cameraPreviewSize.height <= 0 ||
-      size.width <= 0 ||
-      size.height <= 0) {
-    return (widthRatio: 1.0, heightRatio: 1.0);
-  }
-
-  // Calculate the scaling ratios for width and height
-  final double widthRatio = size.width / cameraPreviewSize.width;
-  final double heightRatio = size.height / cameraPreviewSize.height;
-
-  switch (boxFit) {
-    case BoxFit.fill:
-      // Stretch to fill the large box without maintaining aspect ratio
-      return (widthRatio: widthRatio, heightRatio: heightRatio);
-
-    case BoxFit.contain:
-      // Maintain aspect ratio, ensure the content fits entirely within the
-      // large box
-      final double ratio = math.min(widthRatio, heightRatio);
-      return (widthRatio: ratio, heightRatio: ratio);
-
-    case BoxFit.cover:
-      // Maintain aspect ratio, ensure the content fully covers the large box
-      final double ratio = math.max(widthRatio, heightRatio);
-      return (widthRatio: ratio, heightRatio: ratio);
-
-    case BoxFit.fitWidth:
-      // Maintain aspect ratio, ensure the width matches the large box
-      return (widthRatio: widthRatio, heightRatio: widthRatio);
-
-    case BoxFit.fitHeight:
-      // Maintain aspect ratio, ensure the height matches the large box
-      return (widthRatio: heightRatio, heightRatio: heightRatio);
-
-    case BoxFit.none:
-      // No scaling
-      return (widthRatio: 1.0, heightRatio: 1.0);
-
-    case BoxFit.scaleDown:
-      // If the content is larger than the large box, scale down to fit;
-      // otherwise, no scaling
-      final double ratio =
-          math.min(1, math.min(widthRatio, heightRatio)).toDouble();
-      return (widthRatio: ratio, heightRatio: ratio);
+        oldDelegate.barcodeValue != barcodeValue ||
+        oldDelegate.deviceOrientation != deviceOrientation;
   }
 }

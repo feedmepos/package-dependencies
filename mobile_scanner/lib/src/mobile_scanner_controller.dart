@@ -10,16 +10,17 @@ import 'package:flutter/widgets.dart';
 import 'package:meta/meta.dart';
 import 'package:mobile_scanner/src/enums/barcode_format.dart';
 import 'package:mobile_scanner/src/enums/camera_facing.dart';
+import 'package:mobile_scanner/src/enums/camera_lens_type.dart';
 import 'package:mobile_scanner/src/enums/detection_speed.dart';
 import 'package:mobile_scanner/src/enums/mobile_scanner_error_code.dart';
 import 'package:mobile_scanner/src/enums/torch_state.dart';
 import 'package:mobile_scanner/src/method_channel/mobile_scanner_method_channel.dart';
 import 'package:mobile_scanner/src/mobile_scanner_exception.dart';
 import 'package:mobile_scanner/src/mobile_scanner_platform_interface.dart';
-import 'package:mobile_scanner/src/mobile_scanner_view_attributes.dart';
 import 'package:mobile_scanner/src/objects/barcode_capture.dart';
 import 'package:mobile_scanner/src/objects/mobile_scanner_state.dart';
 import 'package:mobile_scanner/src/objects/start_options.dart';
+import 'package:mobile_scanner/src/objects/switch_camera_option.dart';
 
 /// The controller for the [MobileScanner] widget.
 class MobileScannerController extends ValueNotifier<MobileScannerState> {
@@ -27,6 +28,7 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
   MobileScannerController({
     this.autoStart = true,
     this.cameraResolution,
+    this.lensType = CameraLensType.any,
     this.detectionSpeed = DetectionSpeed.normal,
     int detectionTimeoutMs = 250,
     this.facing = CameraFacing.back,
@@ -84,6 +86,17 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
   ///
   /// Defaults to the back-facing camera.
   final CameraFacing facing;
+
+  /// The lens type for the camera.
+  ///
+  /// This allows selection between normal, wide, and zoom lenses on devices
+  /// with multiple cameras.
+  ///
+  /// Defaults to [CameraLensType.any], which uses the first available camera
+  /// for the given [facing] direction.
+  ///
+  /// Currently only supported on iOS and Android.
+  final CameraLensType lensType;
 
   /// The formats that the scanner should detect.
   ///
@@ -157,7 +170,7 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
   void _setupListeners() {
     _barcodesSubscription = MobileScannerPlatform.instance.barcodesStream
         .listen(
-          (BarcodeCapture? barcode) {
+          (barcode) {
             if (_barcodesController.isClosed || barcode == null) {
               return;
             }
@@ -176,7 +189,7 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
         );
 
     _torchStateSubscription = MobileScannerPlatform.instance.torchStateStream
-        .listen((TorchState torchState) {
+        .listen((torchState) {
           if (_isDisposed) {
             return;
           }
@@ -185,7 +198,7 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
         });
 
     _zoomScaleSubscription = MobileScannerPlatform.instance.zoomScaleStateStream
-        .listen((double zoomScale) {
+        .listen((zoomScale) {
           if (_isDisposed) {
             return;
           }
@@ -198,7 +211,7 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
         when defaultTargetPlatform != TargetPlatform.macOS) {
       _deviceOrientationSubscription = implementation
           .deviceOrientationChangedStream
-          .listen((DeviceOrientation orientation) {
+          .listen((orientation) {
             if (_isDisposed) {
               return;
             }
@@ -209,20 +222,23 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
   }
 
   void _throwIfNotInitialized() {
-    if (!value.isInitialized) {
-      throw MobileScannerException(
-        errorCode: MobileScannerErrorCode.controllerUninitialized,
-        errorDetails: MobileScannerErrorDetails(
-          message: MobileScannerErrorCode.controllerUninitialized.message,
-        ),
-      );
-    }
-
+    // If the controller is disposed,
+    // for example, it was never started, and then disposed,
+    // throw the disposed error.
     if (_isDisposed) {
       throw MobileScannerException(
         errorCode: MobileScannerErrorCode.controllerDisposed,
         errorDetails: MobileScannerErrorDetails(
           message: MobileScannerErrorCode.controllerDisposed.message,
+        ),
+      );
+    }
+
+    if (!value.isInitialized) {
+      throw MobileScannerException(
+        errorCode: MobileScannerErrorCode.controllerUninitialized,
+        errorDetails: MobileScannerErrorDetails(
+          message: MobileScannerErrorCode.controllerUninitialized.message,
         ),
       );
     }
@@ -242,7 +258,7 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
 
     _disposeListeners();
 
-    final TorchState oldTorchState = value.torchState;
+    final oldTorchState = value.torchState;
 
     // After the camera stopped, set the torch state to off,
     // as the torch state callback is never called when the camera is stopped.
@@ -319,7 +335,7 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
       return;
     }
 
-    final double clampedZoomScale = zoomScale.clamp(0.0, 1.0);
+    final clampedZoomScale = zoomScale.clamp(0.0, 1.0);
 
     // Update the zoom scale state to the new state.
     // When the platform has updated the zoom scale,
@@ -339,7 +355,7 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
       return;
     }
 
-    final Offset clampedPosition = Offset(
+    final clampedPosition = Offset(
       position.dx.clamp(0, 1),
       position.dy.clamp(0, 1),
     );
@@ -352,13 +368,19 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
   /// The [cameraDirection] can be used to specify the camera direction.
   /// If this is null, this defaults to the [facing] value.
   ///
+  /// The [cameraLensType] can be used to specify the camera lens type.
+  /// If this is null, this defaults to the [lensType] value.
+  ///
   /// Does nothing if the camera is already running.
   /// Upon calling this method, the necessary camera permission will be
   /// requested.
   ///
   /// If the permission is denied on iOS, MacOS or Web, there is no way to
   /// request it again.
-  Future<void> start({CameraFacing? cameraDirection}) async {
+  Future<void> start({
+    CameraFacing? cameraDirection,
+    CameraLensType? cameraLensType,
+  }) async {
     if (_isDisposed) {
       throw MobileScannerException(
         errorCode: MobileScannerErrorCode.controllerDisposed,
@@ -426,8 +448,9 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
       value = value.copyWith(isStarting: true);
     }
 
-    final StartOptions options = StartOptions(
+    final options = StartOptions(
       cameraDirection: cameraDirection ?? facing,
+      cameraLensType: cameraLensType ?? lensType,
       cameraResolution: cameraResolution,
       detectionSpeed: detectionSpeed,
       detectionTimeoutMs: detectionTimeoutMs,
@@ -442,13 +465,15 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
     try {
       _setupListeners();
 
-      final MobileScannerViewAttributes viewAttributes =
-          await MobileScannerPlatform.instance.start(options);
+      final viewAttributes = await MobileScannerPlatform.instance.start(
+        options,
+      );
 
       if (!_isDisposed) {
         value = value.copyWith(
           availableCameras: viewAttributes.numberOfCameras,
           cameraDirection: viewAttributes.cameraDirection,
+          cameraLensType: options.cameraLensType,
           isInitialized: true,
           isStarting: false,
           isRunning: true,
@@ -501,15 +526,41 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
     }
   }
 
-  /// Switch between the front and back camera.
+  /// Switch the camera based on the given [option].
   ///
-  /// Does nothing if the device has less than 2 cameras,
-  /// or if the current camera is an external camera.
-  Future<void> switchCamera() async {
+  /// The [option] parameter determines how the camera is switched:
+  /// - [ToggleDirection]: Toggles between front and back cameras (default).
+  /// - [ToggleLensType]: Cycles through available lens types on the current
+  ///   camera facing direction.
+  /// - [SelectCamera]: Selects a specific camera direction and/or lens type.
+  ///
+  /// For [ToggleDirection], does nothing if the device has less than 2 cameras,
+  /// or if the current camera direction is [CameraFacing.unknown]
+  /// or [CameraFacing.external].
+  ///
+  /// For [ToggleLensType], does nothing if the device has less than 2 lens
+  /// types available.
+  Future<void> switchCamera([
+    SwitchCameraOption option = const ToggleDirection(),
+  ]) async {
     _throwIfNotInitialized();
 
-    final int? availableCameras = value.availableCameras;
-    final CameraFacing cameraDirection = value.cameraDirection;
+    switch (option) {
+      case ToggleDirection():
+        await _toggleCameraDirection();
+      case ToggleLensType():
+        await _toggleLensType();
+      case SelectCamera(:final facingDirection, :final lensType):
+        await _selectCamera(
+          facingDirection: facingDirection,
+          lensType: lensType,
+        );
+    }
+  }
+
+  Future<void> _toggleCameraDirection() async {
+    final availableCameras = value.availableCameras;
+    final cameraDirection = value.cameraDirection;
 
     // Do nothing if the amount of cameras is less than 2 cameras.
     // If the the current platform does not provide the amount of cameras,
@@ -538,6 +589,83 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
     }
   }
 
+  Future<void> _toggleLensType() async {
+    // Fetch supported lenses fresh each time to handle dynamic camera changes
+    // (e.g., external cameras being attached/detached).
+    final supportedLenses = await getSupportedLenses();
+
+    // Filter out 'any' and keep only specific lens types.
+    final specificLenses =
+        supportedLenses.where((lens) => lens != CameraLensType.any).toList();
+
+    // Do nothing if there are less than 2 lens types available.
+    if (specificLenses.length < 2) {
+      return;
+    }
+
+    // Define the lens cycle order.
+    const lensCycle = [
+      CameraLensType.normal,
+      CameraLensType.wide,
+      CameraLensType.zoom,
+    ];
+
+    // Find the current lens type from state (default to normal if unknown).
+    final stateLensType = value.cameraLensType;
+    final currentLens =
+        stateLensType == CameraLensType.any
+            ? CameraLensType.normal
+            : stateLensType;
+
+    // Find the next available lens in the cycle.
+    final currentIndex = lensCycle.indexOf(currentLens);
+    CameraLensType? nextLens;
+
+    for (var i = 1; i <= lensCycle.length; i++) {
+      final candidateIndex = (currentIndex + i) % lensCycle.length;
+      final candidate = lensCycle[candidateIndex];
+      if (specificLenses.contains(candidate)) {
+        nextLens = candidate;
+        break;
+      }
+    }
+
+    // If no next lens found (shouldn't happen with 2+ lenses), do nothing.
+    if (nextLens == null || nextLens == currentLens) {
+      return;
+    }
+
+    await stop();
+    return start(
+      cameraDirection: value.cameraDirection,
+      cameraLensType: nextLens,
+    );
+  }
+
+  Future<void> _selectCamera({
+    CameraFacing? facingDirection,
+    CameraLensType lensType = CameraLensType.any,
+  }) async {
+    // Use current direction if not specified.
+    final targetDirection = facingDirection ?? value.cameraDirection;
+
+    // If the target direction is unknown or external, do nothing.
+    if (targetDirection == CameraFacing.unknown ||
+        targetDirection == CameraFacing.external) {
+      return;
+    }
+
+    // Skip if the configuration is already the same to avoid unnecessary
+    // camera restarts and UI flicker.
+    if (targetDirection == value.cameraDirection &&
+        lensType == value.cameraLensType) {
+      return;
+    }
+
+    await stop();
+    return start(cameraDirection: targetDirection, cameraLensType: lensType);
+  }
+
   /// Switches the flashlight on or off.
   ///
   /// Does nothing if the device has no torch,
@@ -552,7 +680,7 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
       return;
     }
 
-    final TorchState torchState = value.torchState;
+    final torchState = value.torchState;
 
     if (torchState == TorchState.unavailable) {
       return;
@@ -576,25 +704,40 @@ class MobileScannerController extends ValueNotifier<MobileScannerState> {
     await MobileScannerPlatform.instance.updateScanWindow(window);
   }
 
-  /// Take a picture using the camera.
+  /// Get the set of supported camera lens types for the current device.
   ///
-  /// Returns the captured image as a [Uint8List] in JPEG format.
+  /// Returns a set of [CameraLensType] values that are available on the
+  /// device. This can be used to determine which lens types can be used
+  /// with the scanner.
   ///
-  /// Throws a [MobileScannerException] if the camera is not started or if
-  /// taking a picture fails.
-  Future<Uint8List> takePicture() async {
-    _throwIfNotInitialized();
-
-    if (!value.isRunning) {
-      throw const MobileScannerException(
-        errorCode: MobileScannerErrorCode.genericError,
+  /// Returns an empty set if the device has no cameras. On platforms
+  /// that do not support querying specific lens types, returns a set
+  /// containing only [CameraLensType.any] if cameras are available.
+  ///
+  /// This method can be called before starting the scanner.
+  ///
+  /// Throws a [MobileScannerException] if the controller has been disposed.
+  ///
+  /// Example:
+  /// ```dart
+  /// final supportedLenses = await controller.getSupportedLenses();
+  /// if (supportedLenses.isEmpty) {
+  ///   print('No camera lenses available');
+  /// } else {
+  ///   print('Available lenses: $supportedLenses');
+  /// }
+  /// ```
+  Future<Set<CameraLensType>> getSupportedLenses() async {
+    if (_isDisposed) {
+      throw MobileScannerException(
+        errorCode: MobileScannerErrorCode.controllerDisposed,
         errorDetails: MobileScannerErrorDetails(
-          message: 'Camera is not running. Cannot take picture.',
+          message: MobileScannerErrorCode.controllerDisposed.message,
         ),
       );
     }
 
-    return MobileScannerPlatform.instance.takePicture();
+    return MobileScannerPlatform.instance.getSupportedLenses();
   }
 
   /// Dispose the controller.

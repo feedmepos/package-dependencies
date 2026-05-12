@@ -8,8 +8,8 @@ class GeoPoint {
   /// If the data does not contain valid GeoPoint coordinates,
   /// then `0,0` is returned.
   factory GeoPoint.fromNative(Map<Object?, Object?> data) {
-    final double? latitude = data['latitude'] as double?;
-    final double? longitude = data['longitude'] as double?;
+    final latitude = data['latitude'] as double?;
+    final longitude = data['longitude'] as double?;
 
     // If either is not set, then this GeoPoint is invalid.
     // Return the geographic center as fallback.

@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_scanner/src/enums/barcode_format.dart';
 
 void main() {
-  group('$BarcodeFormat tests', () {
+  group('BarcodeFormat tests', () {
     test('can be created from raw value', () {
       const values = <int, BarcodeFormat>{
         -1: BarcodeFormat.unknown,
@@ -14,7 +14,9 @@ void main() {
         16: BarcodeFormat.dataMatrix,
         32: BarcodeFormat.ean13,
         64: BarcodeFormat.ean8,
-        128: BarcodeFormat.itf,
+        126: BarcodeFormat.itf2of5,
+        127: BarcodeFormat.itf2of5WithChecksum,
+        128: BarcodeFormat.itf14,
         256: BarcodeFormat.qrCode,
         512: BarcodeFormat.upcA,
         1024: BarcodeFormat.upcE,
@@ -22,16 +24,28 @@ void main() {
         4096: BarcodeFormat.aztec,
       };
 
-      for (final MapEntry<int, BarcodeFormat> entry in values.entries) {
-        final BarcodeFormat result = BarcodeFormat.fromRawValue(entry.key);
+      for (final entry in values.entries) {
+        final result = BarcodeFormat.fromRawValue(entry.key);
 
         expect(result, entry.value);
       }
+
+      final expectedRawValues =
+          BarcodeFormat.values.map((e) => e.rawValue).toSet();
+      final actualRawValues = values.keys.toSet();
+
+      // Deprecated formats are collapsed into their replacements,
+      // so compare the values using a Set.
+      expect(
+        actualRawValues.length,
+        expectedRawValues.length,
+        reason: 'All BarcodeFormats should be tested.',
+      );
     });
 
     test('invalid raw value throws argument error', () {
-      const int negative = -2;
-      const int outOfRange = 4097;
+      const negative = -2;
+      const outOfRange = 4097;
 
       expect(() => BarcodeFormat.fromRawValue(negative), throwsArgumentError);
       expect(() => BarcodeFormat.fromRawValue(outOfRange), throwsArgumentError);
@@ -48,7 +62,10 @@ void main() {
         BarcodeFormat.dataMatrix: 16,
         BarcodeFormat.ean13: 32,
         BarcodeFormat.ean8: 64,
+        BarcodeFormat.itf2of5: 126,
+        BarcodeFormat.itf2of5WithChecksum: 127,
         BarcodeFormat.itf: 128,
+        BarcodeFormat.itf14: 128,
         BarcodeFormat.qrCode: 256,
         BarcodeFormat.upcA: 512,
         BarcodeFormat.upcE: 1024,
@@ -56,11 +73,17 @@ void main() {
         BarcodeFormat.aztec: 4096,
       };
 
-      for (final MapEntry<BarcodeFormat, int> entry in values.entries) {
-        final int result = entry.key.rawValue;
+      for (final entry in values.entries) {
+        final result = entry.key.rawValue;
 
         expect(result, entry.value);
       }
+
+      expect(
+        values.entries.length,
+        BarcodeFormat.values.length,
+        reason: 'All BarcodeFormats should be tested.',
+      );
     });
   });
 }

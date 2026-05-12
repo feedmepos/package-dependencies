@@ -27,8 +27,18 @@ enum BarcodeFormat {
   /// Barcode format constant for EAN-8.
   ean8(64),
 
+  /// Barcode format constant for Interleaved 2 of 5.
+  itf2of5(126),
+
+  /// Barcode format constant for Interleaved 2 of 5, with a checksum.
+  itf2of5WithChecksum(127),
+
   /// Barcode format constant for ITF (Interleaved Two-of-Five).
+  @Deprecated('Use BarcodeFormats.itf14 instead.')
   itf(128),
+
+  /// Barcode format constant for ITF-14 (Interleaved Two-of-Five).
+  itf14(128),
 
   /// Barcode format constant for QR Codes.
   qrCode(256),
@@ -60,15 +70,19 @@ enum BarcodeFormat {
       case 4:
         return BarcodeFormat.code93;
       case 8:
-        return BarcodeFormat.codebar;
+        return BarcodeFormat.codabar;
       case 16:
         return BarcodeFormat.dataMatrix;
       case 32:
         return BarcodeFormat.ean13;
       case 64:
         return BarcodeFormat.ean8;
+      case 126:
+        return BarcodeFormat.itf2of5;
+      case 127:
+        return BarcodeFormat.itf2of5WithChecksum;
       case 128:
-        return BarcodeFormat.itf;
+        return BarcodeFormat.itf14;
       case 256:
         return BarcodeFormat.qrCode;
       case 512:
@@ -88,6 +102,7 @@ enum BarcodeFormat {
   ///
   /// Prefer using the new [BarcodeFormat.codabar] constant,
   /// as the `codebar` value will be removed in a future release.
+  @Deprecated('Use BarcodeFormat.codabar instead.')
   static const BarcodeFormat codebar = codabar;
 
   /// The raw value of the barcode format.

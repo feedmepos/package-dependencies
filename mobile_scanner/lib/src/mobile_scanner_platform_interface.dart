@@ -1,7 +1,6 @@
-import 'dart:typed_data';
-
 import 'package:flutter/widgets.dart';
 import 'package:mobile_scanner/src/enums/barcode_format.dart';
+import 'package:mobile_scanner/src/enums/camera_lens_type.dart';
 import 'package:mobile_scanner/src/enums/torch_state.dart';
 import 'package:mobile_scanner/src/method_channel/mobile_scanner_method_channel.dart';
 import 'package:mobile_scanner/src/mobile_scanner_view_attributes.dart';
@@ -119,11 +118,18 @@ abstract class MobileScannerPlatform extends PlatformInterface {
     throw UnimplementedError('toggleTorch() has not been implemented.');
   }
 
-  /// Take a picture using the camera.
+  /// Get the set of supported camera lens types for the current device.
   ///
-  /// Returns the image as a [Uint8List] in JPEG format.
-  Future<Uint8List> takePicture() {
-    throw UnimplementedError('takePicture() has not been implemented.');
+  /// Returns a set of [CameraLensType] values that are available on the
+  /// device.
+  ///
+  /// Returns an empty set if the device has no cameras. On platforms
+  /// that do not support querying specific lens types, returns a set
+  /// containing only [CameraLensType.any] if cameras are available.
+  ///
+  /// This method can be called before starting the scanner.
+  Future<Set<CameraLensType>> getSupportedLenses() {
+    throw UnimplementedError('getSupportedLenses() has not been implemented.');
   }
 
   /// Update the scan window to the given [window] rectangle.

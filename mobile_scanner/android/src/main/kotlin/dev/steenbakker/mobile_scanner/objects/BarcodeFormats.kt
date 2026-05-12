@@ -29,7 +29,7 @@ enum class BarcodeFormats(val intValue: Int) {
                 16 -> DATA_MATRIX
                 32 -> EAN_13
                 64 -> EAN_8
-                128 -> ITF
+                126, 127, 128 -> ITF
                 256 -> QR_CODE
                 512 -> UPC_A
                 1024 -> UPC_E

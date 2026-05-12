@@ -48,7 +48,7 @@ class ScanWindowPainter extends CustomPainter {
     final backgroundPath = Path()..addRect(Offset.zero & size);
 
     // The cutout rect depends on the border radius.
-    final RRect cutoutRect =
+    final cutoutRect =
         borderRadius == BorderRadius.zero
             ? RRect.fromRectAndCorners(scanWindow)
             : RRect.fromRectAndCorners(
@@ -60,22 +60,22 @@ class ScanWindowPainter extends CustomPainter {
             );
 
     // The cutout path is always in the center.
-    final Path cutoutPath = Path()..addRRect(cutoutRect);
+    final cutoutPath = Path()..addRRect(cutoutRect);
 
     // Combine the two paths: overlay minus the cutout area
-    final Path overlayWithCutoutPath = Path.combine(
+    final overlayWithCutoutPath = Path.combine(
       PathOperation.difference,
       backgroundPath,
       cutoutPath,
     );
 
-    final Paint overlayWithCutoutPaint =
+    final overlayWithCutoutPaint =
         Paint()
           ..color = color
           ..style = PaintingStyle.fill
           ..blendMode = BlendMode.srcOver; // android
 
-    final Paint borderPaint =
+    final borderPaint =
         Paint()
           ..color = borderColor
           ..style = borderStyle

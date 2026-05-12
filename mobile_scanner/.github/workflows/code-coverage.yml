@@ -14,7 +14,7 @@ jobs:
     steps:
       # Checkout the Repository
       - name: 📥 Checkout Repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       # Setup Flutter SDK with Cache
       - name: ⚡ Set Up Flutter
@@ -25,7 +25,7 @@ jobs:
 
       # Cache Pub Dependencies
       - name: 📦 Cache Pub Dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.pub-cache
@@ -44,7 +44,7 @@ jobs:
 
       # Upload Coverage Report as Artifact
       - name: 📊 Upload Coverage Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-report
           path: coverage/lcov.info

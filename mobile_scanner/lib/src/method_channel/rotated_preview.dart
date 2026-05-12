@@ -27,7 +27,7 @@ final class RotatedPreview extends StatefulWidget {
     required double sensorOrientationDegrees,
     Key? key,
   }) {
-    final int facingSignForDirection = switch (cameraFacingDirection) {
+    final facingSignForDirection = switch (cameraFacingDirection) {
       CameraFacing.front => 1,
       CameraFacing.back => -1,
       CameraFacing.unknown => 1,
@@ -101,7 +101,7 @@ final class _RotatedPreviewState extends State<RotatedPreview> {
     required double sensorOrientationDegrees,
     required int sign,
   }) {
-    final double deviceOrientationDegrees = switch (orientation) {
+    final deviceOrientationDegrees = switch (orientation) {
       DeviceOrientation.portraitUp => 0,
       DeviceOrientation.landscapeRight => 90,
       DeviceOrientation.portraitDown => 180,
@@ -110,7 +110,7 @@ final class _RotatedPreviewState extends State<RotatedPreview> {
 
     // Rotate the camera preview according to
     // https://developer.android.com/media/camera/camera2/camera-preview#orientation_calculation.
-    double rotationDegrees =
+    var rotationDegrees =
         (sensorOrientationDegrees - deviceOrientationDegrees * sign + 360) %
         360;
 
@@ -127,7 +127,7 @@ final class _RotatedPreviewState extends State<RotatedPreview> {
 
   @override
   Widget build(BuildContext context) {
-    final double rotationDegrees = _computeRotationDegrees(
+    final rotationDegrees = _computeRotationDegrees(
       deviceOrientation,
       sensorOrientationDegrees: widget.sensorOrientationDegrees,
       sign: widget.facingSign,

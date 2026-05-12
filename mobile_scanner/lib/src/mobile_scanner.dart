@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile_scanner/src/method_channel/mobile_scanner_method_channel.dart';
 import 'package:mobile_scanner/src/mobile_scanner_controller.dart';
 import 'package:mobile_scanner/src/mobile_scanner_exception.dart';
@@ -9,8 +10,7 @@ import 'package:mobile_scanner/src/mobile_scanner_platform_interface.dart';
 import 'package:mobile_scanner/src/mobile_scanner_preview.dart';
 import 'package:mobile_scanner/src/objects/barcode_capture.dart';
 import 'package:mobile_scanner/src/objects/mobile_scanner_state.dart';
-import 'package:mobile_scanner/src/objects/scanner_error_widget.dart';
-import 'package:mobile_scanner/src/scan_window_calculation.dart';
+import 'package:mobile_scanner/src/utils/scan_window_utils.dart';
 
 /// This widget displays a live camera preview for the barcode scanner.
 class MobileScanner extends StatefulWidget {
@@ -162,154 +162,17 @@ class MobileScanner extends StatefulWidget {
 
 class _MobileScannerState extends State<MobileScanner>
     with WidgetsBindingObserver {
+  /// The controller for this [MobileScanner] widget.
   late final MobileScannerController controller;
 
-  /// The current scan window.
-  Rect? scanWindow;
+  /// The current scan window, if any.
+  Rect? _scanWindow;
 
-  /// Calculate the scan window based on the given [constraints].
-  ///
-  /// If the [scanWindow] is already set, this method does nothing.
-  void _maybeUpdateScanWindow(
-    MobileScannerState scannerState,
-    BoxConstraints constraints,
-  ) {
-    if (widget.scanWindow == null && scanWindow == null) {
-      return;
-    } else if (widget.scanWindow == null) {
-      scanWindow = null;
-
-      unawaited(controller.updateScanWindow(null));
-      return;
-    }
-
-    final Rect newScanWindow = calculateScanWindowRelativeToTextureInPercentage(
-      widget.fit,
-      widget.scanWindow!,
-      textureSize: scannerState.size,
-      widgetSize: constraints.biggest,
-    );
-
-    // The scan window was never set before.
-    // Set the initial scan window.
-    if (scanWindow == null) {
-      scanWindow = newScanWindow;
-
-      unawaited(controller.updateScanWindow(scanWindow));
-
-      return;
-    }
-
-    // The scan window did not not change.
-    // The left, right, top and bottom are the same.
-    if (scanWindow == newScanWindow) {
-      return;
-    }
-
-    // The update threshold is not set, allow updating the scan window.
-    if (widget.scanWindowUpdateThreshold == 0.0) {
-      scanWindow = newScanWindow;
-
-      unawaited(controller.updateScanWindow(scanWindow));
-
-      return;
-    }
-
-    final double dx = (newScanWindow.width - scanWindow!.width).abs();
-    final double dy = (newScanWindow.height - scanWindow!.height).abs();
-
-    // The new scan window has changed enough, allow updating the scan window.
-    if (dx >= widget.scanWindowUpdateThreshold ||
-        dy >= widget.scanWindowUpdateThreshold) {
-      scanWindow = newScanWindow;
-
-      unawaited(controller.updateScanWindow(scanWindow));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<MobileScannerState>(
-      valueListenable: controller,
-      builder: (BuildContext context, MobileScannerState value, _) {
-        if (!value.isInitialized) {
-          const Widget defaultPlaceholder = ColoredBox(color: Colors.black);
-
-          return widget.placeholderBuilder?.call(context) ?? defaultPlaceholder;
-        }
-
-        final MobileScannerException? error = value.error;
-        if (error != null) {
-          final Widget defaultError = ScannerErrorWidget(error: error);
-
-          return widget.errorBuilder?.call(context, error) ?? defaultError;
-        }
-
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            _maybeUpdateScanWindow(value, constraints);
-
-            final Widget? overlay = widget.overlayBuilder?.call(
-              context,
-              constraints,
-            );
-
-            final Widget scannerWidget = ClipRect(
-              child: SizedBox.fromSize(
-                size: constraints.biggest,
-                child: FittedBox(
-                  fit: widget.fit,
-                  child: CameraPreview(controller),
-                ),
-              ),
-            );
-
-            final Widget tapToFocusScannerWidget = Builder(
-              builder: (context) {
-                return GestureDetector(
-                  child: scannerWidget,
-                  onTapUp: (details) async {
-                    final Size size = MediaQuery.sizeOf(context);
-                    final double relativeX =
-                        details.globalPosition.dx / size.width;
-                    final double relativeY =
-                        details.globalPosition.dy / size.height;
-
-                    await controller.setFocusPoint(
-                      Offset(relativeX, relativeY),
-                    );
-                  },
-                );
-              },
-            );
-
-            if (overlay == null) {
-              if (widget.tapToFocus) {
-                return tapToFocusScannerWidget;
-              }
-
-              return scannerWidget;
-            }
-
-            return Stack(
-              alignment: Alignment.center,
-              children: <Widget>[
-                if (widget.tapToFocus)
-                  tapToFocusScannerWidget
-                else
-                  scannerWidget,
-                IgnorePointer(child: overlay),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
+  /// The subscription for the barcode stream,
+  /// in case [MobileScanner.onDetect] is provided.
   StreamSubscription<BarcodeCapture>? _subscription;
 
-  Future<void> initMobileScanner() async {
+  Future<void> _initializeController() async {
     controller = widget.controller ?? MobileScannerController();
 
     controller.attach();
@@ -347,7 +210,7 @@ class _MobileScannerState extends State<MobileScanner>
     }
   }
 
-  Future<void> disposeMobileScanner() async {
+  Future<void> _disposeController() async {
     if (widget.controller == null) {
       WidgetsBinding.instance.removeObserver(this);
     }
@@ -359,22 +222,187 @@ class _MobileScannerState extends State<MobileScanner>
       await controller.stop();
     }
 
-    // Dispose default controller if not provided by user
+    // Dispose the internal controller, if it was set up.
     if (widget.controller == null) {
       await controller.dispose();
+    }
+  }
+
+  /// Calculate the scan window based on the given [constraints].
+  void _maybeUpdateScanWindow(
+    MobileScannerState scannerState,
+    BoxConstraints constraints,
+  ) {
+    // No scan window is requested.
+    if (widget.scanWindow == null && _scanWindow == null) {
+      return;
+    }
+
+    final widgetScanWindow = widget.scanWindow;
+
+    // Clear the current scan window.
+    if (widgetScanWindow == null) {
+      _scanWindow = null;
+
+      unawaited(controller.updateScanWindow(null));
+      return;
+    }
+
+    final newScanWindow =
+        ScanWindowUtils.calculateScanWindowRelativeToTextureInPercentage(
+          widget.fit,
+          widgetScanWindow,
+          textureSize: switch (scannerState.deviceOrientation) {
+            DeviceOrientation.landscapeLeft ||
+            DeviceOrientation.landscapeRight => scannerState.size.flipped,
+            DeviceOrientation.portraitUp ||
+            DeviceOrientation.portraitDown => scannerState.size,
+          },
+          widgetSize: constraints.biggest,
+        );
+
+    // The scan window was never set before.
+    // Set the initial scan window.
+    if (_scanWindow == null) {
+      _scanWindow = newScanWindow;
+
+      unawaited(controller.updateScanWindow(_scanWindow));
+
+      return;
+    }
+
+    // The scan window did not not change.
+    // The left, right, top and bottom are the same.
+    if (_scanWindow == newScanWindow) {
+      return;
+    }
+
+    // The update threshold is not set, allow updating the scan window.
+    if (widget.scanWindowUpdateThreshold == 0.0) {
+      _scanWindow = newScanWindow;
+
+      unawaited(controller.updateScanWindow(_scanWindow));
+
+      return;
+    }
+
+    final currentScanWindow = _scanWindow;
+
+    if (currentScanWindow == null) {
+      return;
+    }
+
+    final dx = (newScanWindow.width - currentScanWindow.width).abs();
+    final dy = (newScanWindow.height - currentScanWindow.height).abs();
+
+    // The new scan window has changed enough, allow updating the scan window.
+    if (dx >= widget.scanWindowUpdateThreshold ||
+        dy >= widget.scanWindowUpdateThreshold) {
+      _scanWindow = newScanWindow;
+
+      unawaited(controller.updateScanWindow(_scanWindow));
     }
   }
 
   @override
   void initState() {
     super.initState();
-    unawaited(initMobileScanner());
+    unawaited(_initializeController());
   }
 
   @override
-  void dispose() {
-    super.dispose();
-    unawaited(disposeMobileScanner());
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<MobileScannerState>(
+      valueListenable: controller,
+      builder: (context, value, _) {
+        if (!value.isInitialized) {
+          const Widget defaultPlaceholder = ColoredBox(color: Colors.black);
+
+          return widget.placeholderBuilder?.call(context) ?? defaultPlaceholder;
+        }
+
+        final error = value.error;
+        if (error != null) {
+          final Widget defaultError = ColoredBox(
+            color: Colors.black,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 16),
+                    child: Icon(Icons.error, color: Colors.white),
+                  ),
+                  Text(
+                    error.errorCode.message,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  if (error.errorDetails?.message case final String message)
+                    Text(message, style: const TextStyle(color: Colors.white)),
+                ],
+              ),
+            ),
+          );
+
+          return widget.errorBuilder?.call(context, error) ?? defaultError;
+        }
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            // TODO(navaronbracke): use a RenderObject to avoid side effect
+            _maybeUpdateScanWindow(value, constraints);
+
+            final overlay = widget.overlayBuilder?.call(context, constraints);
+
+            final Widget scannerWidget = ClipRect(
+              child: SizedBox.fromSize(
+                size: constraints.biggest,
+                child: FittedBox(
+                  fit: widget.fit,
+                  child: CameraPreview(controller),
+                ),
+              ),
+            );
+
+            final Widget tapToFocusScannerWidget = Builder(
+              builder: (context) {
+                return GestureDetector(
+                  child: scannerWidget,
+                  onTapUp: (details) async {
+                    final size = MediaQuery.sizeOf(context);
+                    final relativeX = details.globalPosition.dx / size.width;
+                    final relativeY = details.globalPosition.dy / size.height;
+
+                    await controller.setFocusPoint(
+                      Offset(relativeX, relativeY),
+                    );
+                  },
+                );
+              },
+            );
+
+            if (overlay == null) {
+              if (widget.tapToFocus) {
+                return tapToFocusScannerWidget;
+              }
+
+              return scannerWidget;
+            }
+
+            return Stack(
+              alignment: Alignment.center,
+              children: <Widget>[
+                if (widget.tapToFocus)
+                  tapToFocusScannerWidget
+                else
+                  scannerWidget,
+                IgnorePointer(ignoring: widget.tapToFocus, child: overlay),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -393,5 +421,11 @@ class _MobileScannerState extends State<MobileScanner>
       case AppLifecycleState.inactive:
         unawaited(controller.stop());
     }
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    unawaited(_disposeController());
   }
 }

@@ -28,7 +28,7 @@ class AndroidSurfaceProducerDelegate {
       'naturalDeviceOrientation': final String naturalDeviceOrientation,
       'sensorOrientation': final int sensorOrientation,
     }) {
-      final DeviceOrientation naturalOrientation =
+      final naturalOrientation =
           naturalDeviceOrientation.parseDeviceOrientation();
 
       return AndroidSurfaceProducerDelegate(

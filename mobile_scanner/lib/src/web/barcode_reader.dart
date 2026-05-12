@@ -85,9 +85,9 @@ abstract class BarcodeReader {
       return;
     }
 
-    final Completer<void> completer = Completer();
+    final completer = Completer<void>();
 
-    final HTMLScriptElement script =
+    final script =
         HTMLScriptElement()
           ..id = scriptId
           ..async = true

@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:mobile_scanner/src/enums/barcode_format.dart';
 import 'package:mobile_scanner/src/enums/camera_facing.dart';
+import 'package:mobile_scanner/src/enums/camera_lens_type.dart';
 import 'package:mobile_scanner/src/enums/mobile_scanner_error_code.dart';
 import 'package:mobile_scanner/src/enums/torch_state.dart';
 import 'package:mobile_scanner/src/mobile_scanner_exception.dart';
@@ -82,7 +83,7 @@ class MobileScannerWeb extends MobileScannerPlatform {
   /// Create the [HTMLVideoElement] along with its parent container
   /// [HTMLDivElement].
   HTMLVideoElement _createVideoElement(int textureId) {
-    final HTMLVideoElement videoElement = HTMLVideoElement();
+    final videoElement = HTMLVideoElement();
 
     videoElement.style
       ..height = '100%'
@@ -135,9 +136,7 @@ class MobileScannerWeb extends MobileScannerPlatform {
     HTMLVideoElement videoElement,
     MediaStream videoStream,
   ) {
-    final MediaTrackSettings? settings = _settingsDelegate.getSettings(
-      videoStream,
-    );
+    final settings = _settingsDelegate.getSettings(videoStream);
 
     // First try checking the facing mode.
     if (settings?.facingModeNullable?.toDart == 'user') {
@@ -146,8 +145,7 @@ class MobileScannerWeb extends MobileScannerPlatform {
       return;
     }
 
-    final MediaStreamTrack videoTrack =
-        videoStream.getVideoTracks().toDart.first;
+    final videoTrack = videoStream.getVideoTracks().toDart.first;
 
     // On MacOS, even though the facing mode is supported, it is not reported.
     // Use the label for FaceTime cameras to detect the user facing webcam.
@@ -174,7 +172,7 @@ class MobileScannerWeb extends MobileScannerPlatform {
       );
     }
 
-    final MediaTrackSupportedConstraints capabilities =
+    final capabilities =
         window.navigator.mediaDevices.getSupportedConstraints();
 
     final MediaStreamConstraints constraints;
@@ -182,9 +180,7 @@ class MobileScannerWeb extends MobileScannerPlatform {
     if (capabilities.isUndefinedOrNull || !capabilities.facingMode) {
       constraints = MediaStreamConstraints(video: true.toJS);
     } else {
-      final String facingMode = _settingsDelegate.getFacingMode(
-        cameraDirection,
-      );
+      final facingMode = _settingsDelegate.getFacingMode(cameraDirection);
 
       constraints = MediaStreamConstraints(
         video: MediaTrackConstraintSet(facingMode: facingMode.toJS),
@@ -193,14 +189,14 @@ class MobileScannerWeb extends MobileScannerPlatform {
 
     try {
       // Retrieving the media devices requests the camera permission.
-      final MediaStream videoStream =
+      final videoStream =
           await window.navigator.mediaDevices.getUserMedia(constraints).toDart;
 
       return videoStream;
     } on DOMException catch (error, stackTrace) {
-      final String errorMessage = error.toString();
+      final errorMessage = error.toString();
 
-      MobileScannerErrorCode errorCode = MobileScannerErrorCode.genericError;
+      var errorCode = MobileScannerErrorCode.genericError;
 
       // Handle both unsupported and permission errors from the web.
       if (errorMessage.contains('NotFoundError') ||
@@ -238,6 +234,31 @@ class MobileScannerWeb extends MobileScannerPlatform {
   }
 
   @override
+  Future<Set<CameraLensType>> getSupportedLenses() async {
+    if (window.navigator.mediaDevices.isUndefinedOrNull) {
+      return <CameraLensType>{};
+    }
+
+    try {
+      final jsDevices =
+          await window.navigator.mediaDevices.enumerateDevices().toDart;
+      final devices = jsDevices.toDart;
+
+      final hasVideoInput = devices.any(
+        (device) => device.kind == 'videoinput',
+      );
+
+      if (!hasVideoInput) {
+        return <CameraLensType>{};
+      }
+
+      return <CameraLensType>{CameraLensType.any};
+    } on DOMException {
+      return <CameraLensType>{};
+    }
+  }
+
+  @override
   Future<void> resetZoomScale() {
     throw UnsupportedError(
       'Setting the zoom scale is not supported for video tracks on the web.\n'
@@ -269,8 +290,9 @@ class MobileScannerWeb extends MobileScannerPlatform {
       if (_barcodeReader!.paused ?? false) {
         await _barcodeReader?.resume();
 
-        final CameraFacing cameraDirection = _settingsDelegate
-            .getCameraDirection(_barcodeReader?.videoStream);
+        final cameraDirection = _settingsDelegate.getCameraDirection(
+          _barcodeReader?.videoStream,
+        );
 
         return MobileScannerViewAttributes(
           cameraDirection: cameraDirection,
@@ -301,9 +323,7 @@ class MobileScannerWeb extends MobileScannerPlatform {
     );
 
     // Request camera permissions and prepare the video stream.
-    final MediaStream videoStream = await _prepareVideoStream(
-      startOptions.cameraDirection,
-    );
+    final videoStream = await _prepareVideoStream(startOptions.cameraDirection);
 
     try {
       // Clear the existing barcodes.
@@ -339,7 +359,7 @@ class MobileScannerWeb extends MobileScannerPlatform {
 
     try {
       _barcodesSubscription = _barcodeReader?.detectBarcodes().listen(
-        (BarcodeCapture barcode) {
+        (barcode) {
           if (_barcodesController.isClosed) {
             return;
           }
@@ -357,15 +377,13 @@ class MobileScannerWeb extends MobileScannerPlatform {
         cancelOnError: false,
       );
 
-      final bool hasTorch = await _barcodeReader?.hasTorch() ?? false;
+      final hasTorch = await _barcodeReader?.hasTorch() ?? false;
 
       if (hasTorch && startOptions.torchEnabled) {
         await _barcodeReader?.setTorchState(TorchState.on);
       }
 
-      final CameraFacing cameraDirection = _settingsDelegate.getCameraDirection(
-        videoStream,
-      );
+      final cameraDirection = _settingsDelegate.getCameraDirection(videoStream);
 
       return MobileScannerViewAttributes(
         cameraDirection: cameraDirection,

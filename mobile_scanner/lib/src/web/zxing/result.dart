@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:mobile_scanner/src/enums/barcode_format.dart';
 import 'package:mobile_scanner/src/enums/barcode_type.dart';
 import 'package:mobile_scanner/src/objects/barcode.dart';
+import 'package:mobile_scanner/src/objects/barcode_bytes.dart';
 import 'package:mobile_scanner/src/web/zxing/result_point.dart';
 
 /// The JS static interop class for the Result class in the ZXing library.
@@ -63,13 +64,13 @@ extension type Result(JSObject _) implements JSObject {
   /// Get the corner points of the result, sorted in clockwise order if four
   /// points exist.
   List<Offset> get resultPoints {
-    final JSArray<ResultPoint>? points = _resultPoints;
+    final points = _resultPoints;
 
     if (points == null || points.length == 0) {
       return const [];
     }
 
-    final List<Offset> pointList =
+    final pointList =
         points.toDart.map((point) {
           return Offset(point.x, point.y);
         }).toList();
@@ -100,10 +101,10 @@ extension type Result(JSObject _) implements JSObject {
       return a.dy.compareTo(b.dy);
     });
 
-    final Offset topLeft = points[3];
-    final Offset topRight = points[2];
-    final Offset bottomRight = points[1];
-    final Offset bottomLeft = points[0];
+    final topLeft = points[3];
+    final topRight = points[2];
+    final bottomRight = points[1];
+    final bottomLeft = points[0];
 
     return [topLeft, topRight, bottomRight, bottomLeft];
   }
@@ -111,9 +112,9 @@ extension type Result(JSObject _) implements JSObject {
   /// Estimate missing fourth corner when given three points (for QR codes)
   List<Offset> estimateFourthPoint(List<Offset> points) {
     // Assume a parallelogram based on three known points
-    final Offset a = points[0];
-    final Offset b = points[1];
-    final Offset c = points[2];
+    final a = points[0];
+    final b = points[1];
+    final c = points[2];
 
     // Compute the missing point (approximate)
     final d = Offset(a.dx + (c.dx - b.dx), a.dy + (c.dy - b.dy));
@@ -124,8 +125,8 @@ extension type Result(JSObject _) implements JSObject {
   /// Estimate remaining corners when only two points are given
   /// (for 1D barcodes)
   List<Offset> estimateRemainingPoints(List<Offset> points) {
-    final Offset start = points[0];
-    final Offset end = points[1];
+    final start = points[0];
+    final end = points[1];
 
     // Approximate barcode height (arbitrary small value for 1D barcodes)
     const double heightOffset = 10;
@@ -143,13 +144,21 @@ extension type Result(JSObject _) implements JSObject {
     // The order of the points is dependent on the type of barcode.
     // Don't do a manual correction here, but leave it up to the reader
     // implementation.
-    final List<Offset> corners = resultPoints;
+    final corners = resultPoints;
+
+    final rawBytesData = rawBytes;
 
     return Barcode(
       corners: corners,
       format: barcodeFormat,
       displayValue: text,
-      rawBytes: rawBytes,
+      // Populate deprecated rawBytes for backward compatibility.
+      // ignore: deprecated_member_use_from_same_package
+      rawBytes: rawBytesData,
+      rawDecodedBytes:
+          rawBytesData != null
+              ? DecodedBarcodeBytes(bytes: rawBytesData)
+              : null,
       rawValue: text,
       size: _computeSize(corners),
       type: BarcodeType.text,
@@ -161,14 +170,14 @@ extension type Result(JSObject _) implements JSObject {
       return Size.zero;
     }
 
-    final Iterable<double> xCoords = points.map((p) => p.dx);
-    final Iterable<double> yCoords = points.map((p) => p.dy);
+    final xCoords = points.map((p) => p.dx);
+    final yCoords = points.map((p) => p.dy);
 
     // Find the minimum and maximum x and y coordinates.
-    final double xMin = xCoords.reduce((a, b) => a < b ? a : b);
-    final double xMax = xCoords.reduce((a, b) => a > b ? a : b);
-    final double yMin = yCoords.reduce((a, b) => a < b ? a : b);
-    final double yMax = yCoords.reduce((a, b) => a > b ? a : b);
+    final xMin = xCoords.reduce((a, b) => a < b ? a : b);
+    final xMax = xCoords.reduce((a, b) => a > b ? a : b);
+    final yMin = yCoords.reduce((a, b) => a < b ? a : b);
+    final yMax = yCoords.reduce((a, b) => a > b ? a : b);
 
     return Size(xMax - xMin, yMax - yMin);
   }

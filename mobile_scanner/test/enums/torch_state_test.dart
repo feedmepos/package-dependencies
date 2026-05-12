@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_scanner/src/enums/torch_state.dart';
 
 void main() {
-  group('$TorchState tests', () {
+  group('TorchState tests', () {
     test('can be created from raw value', () {
       const values = <int, TorchState>{
         0: TorchState.off,
@@ -11,16 +11,16 @@ void main() {
         -1: TorchState.unavailable,
       };
 
-      for (final MapEntry<int, TorchState> entry in values.entries) {
-        final TorchState result = TorchState.fromRawValue(entry.key);
+      for (final entry in values.entries) {
+        final result = TorchState.fromRawValue(entry.key);
 
         expect(result, entry.value);
       }
     });
 
     test('invalid raw value throws argument error', () {
-      const int negative = -2;
-      const int outOfRange = 3;
+      const negative = -2;
+      const outOfRange = 3;
 
       expect(() => TorchState.fromRawValue(negative), throwsArgumentError);
       expect(() => TorchState.fromRawValue(outOfRange), throwsArgumentError);
@@ -34,8 +34,8 @@ void main() {
         TorchState.auto: 2,
       };
 
-      for (final MapEntry<TorchState, int> entry in values.entries) {
-        final int result = entry.key.rawValue;
+      for (final entry in values.entries) {
+        final result = entry.key.rawValue;
 
         expect(result, entry.value);
       }

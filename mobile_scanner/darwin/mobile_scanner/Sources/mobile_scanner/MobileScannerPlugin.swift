@@ -30,12 +30,6 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
     // Image to be sent to the texture
     var latestBuffer: CVImageBuffer!
 
-    // Photo output for taking pictures
-    var photoOutput: AVCapturePhotoOutput?
-
-    // Completion handler for photo capture
-    var photoCompletionHandler: ((Data?, Error?) -> Void)?
-
     // optional window to limit scan search
     var scanWindow: CGRect?
 
@@ -52,11 +46,11 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
     var position = AVCaptureDevice.Position.back
     
     var standardZoomFactor: CGFloat = 1
-    
+
 #if os(iOS)
-    var deviceOrientation: UIDeviceOrientation = UIDeviceOrientation.unknown
+    var interfaceOrientationObserver: NSObjectProtocol?
 #endif
-    
+
     private var stopped: Bool {
         return device == nil || captureSession == nil
     }
@@ -82,11 +76,11 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
 
         registrar.addMethodCallDelegate(instance, channel: method)
         event.setStreamHandler(instance)
-        
+
 #if os(iOS)
         let orientationEvent = FlutterEventChannel(name:
                                             "dev.steenbakker.mobile_scanner/scanner/deviceOrientation", binaryMessenger: messenger)
-        orientationEvent.setStreamHandler(DeviceOrientationStreamHandler(onOrientationChanged: instance.setDeviceOrientation))
+        orientationEvent.setStreamHandler(DeviceOrientationStreamHandler())
 #endif
     }
     
@@ -105,6 +99,8 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
             start(call, result)
         case "toggleTorch":
             toggleTorch(result)
+        case "getSupportedLenses":
+            getSupportedLenses(result)
         case "setScale":
             setScale(call, result)
         case "setFocus":
@@ -119,8 +115,6 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
             updateScanWindow(call, result)
         case "analyzeImage":
             analyzeImage(call, result)
-        case "takePicture":
-            takePicture(result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -140,10 +134,11 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
     
     // FlutterTexture
     public func copyPixelBuffer() -> Unmanaged<CVPixelBuffer>? {
-        if latestBuffer == nil {
+        guard let buffer = latestBuffer else {
             return nil
         }
-        return Unmanaged<CVPixelBuffer>.passRetained(latestBuffer)
+
+        return Unmanaged<CVPixelBuffer>.passRetained(buffer)
     }
     
     var nextScanTime = 0.0
@@ -167,13 +162,26 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
             nextScanTime = currentTime + timeoutSeconds
             imagesCurrentlyBeingProcessed = true
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                guard let self = self else { return }
-                if self.latestBuffer == nil {
+                guard let self = self else {
                     return
                 }
-                var cgImage: CGImage?
-                VTCreateCGImageFromCVPixelBuffer(self.latestBuffer, options: nil, imageOut: &cgImage)
-                let imageRequestHandler = VNImageRequestHandler(cgImage: cgImage!)
+                
+                guard let buffer = self.latestBuffer else {
+                    self.imagesCurrentlyBeingProcessed = false
+                    return
+                }
+                
+                var cgImage: CGImage? = nil
+                
+                let status = VTCreateCGImageFromCVPixelBuffer(buffer, options: nil, imageOut: &cgImage)
+                
+                guard status == kCVReturnSuccess, let currentImage = cgImage else {
+                    self.imagesCurrentlyBeingProcessed = false
+                    return
+                }
+                
+                let imageRequestHandler = VNImageRequestHandler(cgImage: currentImage)
+                
                 do {
                     let barcodeRequest: VNDetectBarcodesRequest = VNDetectBarcodesRequest(completionHandler: { [weak self] (request, error) in
                         self?.imagesCurrentlyBeingProcessed = false
@@ -198,29 +206,43 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
                         let barcodes: [VNBarcodeObservation] = results.compactMap({ barcode in
                             return barcode
                         })
+                        
+                        var bytes: FlutterStandardTypedData? = nil
+                        
+                        if MobileScannerPlugin.returnImage,
+                           let imageBytes = currentImage.jpegData(compressionQuality: 0.8) {
+                            bytes = FlutterStandardTypedData(bytes: imageBytes)
+                        }
 
                         DispatchQueue.main.async {
-                            // If the image is nil, use zero as the size.
-                            guard let image = cgImage else {
-                                self?.sink?([
-                                    "name": "barcode",
-                                    "data": barcodes.map({ $0.toMap(imageWidth: 0, imageHeight: 0, scanWindow: nil)}),
-                                ])
-                                return
-                            }
-
-                            // The image dimensions are always provided.
-                            // The image bytes are only non-null when `returnImage` is true.
+#if os(iOS)
+                            // Always report portrait-ized dimensions on iOS,
+                            // matching the convention used in start().
+                            // The Dart-side BarcodePainter flips these back
+                            // when the device is in landscape orientation.
                             let imageData: [String: Any?] = [
-                                "bytes": MobileScannerPlugin.returnImage ? FlutterStandardTypedData(bytes: image.jpegData(compressionQuality: 0.8)!) : nil,
-                                "width": Double(image.width),
-                                "height": Double(image.height),
+                                "bytes": bytes,
+                                "width": Double(min(currentImage.width, currentImage.height)),
+                                "height": Double(max(currentImage.width, currentImage.height)),
                             ]
+#else
+                            let imageData: [String: Any?] = [
+                                "bytes": bytes,
+                                "width": Double(currentImage.width),
+                                "height": Double(currentImage.height),
+                            ]
+#endif
 
                             self?.sink?([
                                 "name": "barcode",
-                                "data": barcodes.map({ $0.toMap(imageWidth: image.width, imageHeight: image.height, scanWindow: self?.scanWindow) }),
                                 "image": imageData,
+                                "data": barcodes.map({
+                                    $0.toMap(
+                                        imageWidth: currentImage.width,
+                                        imageHeight: currentImage.height,
+                                        scanWindow: self?.scanWindow
+                                    )
+                                }),
                             ])
                         }
                     })
@@ -237,6 +259,8 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
 
                     try imageRequestHandler.perform([barcodeRequest])
                 } catch let error {
+                    imagesCurrentlyBeingProcessed = false
+                    
                     DispatchQueue.main.async {
                         self.sink?(FlutterError(
                             code: MobileScannerErrorCodes.BARCODE_ERROR,
@@ -273,7 +297,7 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
 
     func updateScanWindow(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
         let argReader = MapArgumentReader(call.arguments as? [String: Any])
-        let scanWindowData: Array? = argReader.floatArray(key: "rect")
+        let scanWindowData: [CGFloat]? = argReader.floatArray(key: "rect")
 
         if (scanWindowData == nil) {
             scanWindow = nil
@@ -298,8 +322,8 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
 
     private func getVideoOrientation() -> AVCaptureVideoOrientation {
 #if os(iOS)
-        // Get the orientation from the window scene if available
-        // When the app's orientation is fixed and the app orientation is actually different from the device orientation, it malfunctions.
+        // Set video orientation to match interface orientation
+        // This ensures the camera feed is correctly oriented
         if #available(iOS 13.0, *) {
             if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
                 let orientation = windowScene.interfaceOrientation
@@ -313,32 +337,15 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
                 case .landscapeRight:
                     return .landscapeRight
                 default:
-                    break
-                }         
+                    return .portrait
+                }
             }
         }
-
-        var videoOrientation: AVCaptureVideoOrientation
-
-        switch UIDevice.current.orientation {
-        case .portrait:
-            videoOrientation = .portrait
-        case .portraitUpsideDown:
-            videoOrientation = .portraitUpsideDown
-        case .landscapeLeft:
-            videoOrientation = .landscapeLeft
-        case .landscapeRight:
-            videoOrientation = .landscapeRight
-        default:
-            videoOrientation = .portrait
-        }
-
-        return videoOrientation
+        return .portrait
 #else
         return .portrait
 #endif
     }
-
 
     func start(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
         if (device != nil || captureSession != nil) {
@@ -355,6 +362,7 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
 
         let torch:Bool = argReader.bool(key: "torch") ?? false
         let facing:Int = argReader.int(key: "facing") ?? 1
+        let lensType:Int = argReader.int(key: "lensType") ?? -1
         let speed:Int = argReader.int(key: "speed") ?? 0
         let timeoutMs:Int = argReader.int(key: "timeout") ?? 0
         let initialZoom: CGFloat? = {
@@ -376,26 +384,10 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
 #else
         position = AVCaptureDevice.Position.front
 #endif
-        
-        // Open the camera device
-#if os(iOS)
-        if #available(iOS 13.0, *) {
-            device = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInTripleCamera, .builtInDualCamera, .builtInWideAngleCamera], mediaType: .video, position: position).devices.first
-        }
-#else
-        if #available(macOS 10.15, *) {
-            device = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera], mediaType: .video, position: position).devices.first
-        }
-#endif
-        
-        if (device == nil) {
-            device = AVCaptureDevice.devices(for: .video).filter({$0.position == position}).first
-        }
-        
-        if (device == nil) {
-            device = AVCaptureDevice.default(for: .video)
-        }
-        
+
+        // Open the camera device based on position and lens type
+        device = MobileScannerCameraSelector.selectCamera(position: position, lensType: lensType)
+
         if (device == nil) {
             result(FlutterError(code: MobileScannerErrorCodes.NO_CAMERA_ERROR,
                                 message: MobileScannerErrorCodes.NO_CAMERA_ERROR_MESSAGE,
@@ -445,27 +437,15 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
         }
         captureSession!.sessionPreset = AVCaptureSession.Preset.high
 
-        // Add video output
         let videoOutput = AVCaptureVideoDataOutput()
-        videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
-        videoOutput.alwaysDiscardsLateVideoFrames = true
 
+        let format = getPreferredVideoFormat(videoOutput: videoOutput)
+        videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: format]
+        videoOutput.alwaysDiscardsLateVideoFrames = true
         videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue.main)
         captureSession!.addOutput(videoOutput)
-        
-        if #available(macOS 10.15, *) {
-            let photoOut = AVCapturePhotoOutput()
-            if captureSession!.canAddOutput(photoOut) {
-                captureSession!.sessionPreset = .photo
-                captureSession!.addOutput(photoOut)
-                photoOutput = photoOut
-            }
-        }
-        
         let deviceVideoOrientation = self.getVideoOrientation()
-        
 
-        // Adjust orientation for the video connection
         if let connection = videoOutput.connections.first {
             if connection.isVideoOrientationSupported {
                 connection.videoOrientation = deviceVideoOrientation
@@ -478,7 +458,11 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
 
         captureSession!.commitConfiguration()
 
-        // Move startRunning to a background thread to avoid blocking the main UI thread.
+#if os(iOS)
+        // Set up observer to update video orientation when interface orientation changes
+        setupInterfaceOrientationObserver()
+#endif
+
         DispatchQueue.global(qos: .background).async {
             self.captureSession!.startRunning()
 
@@ -491,12 +475,10 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
                     dimensions = CMVideoDimensions()
                 }
 
-                // Turn on the torch if requested.
                 if (torch) {
                     self.turnTorchOn()
                 }
                 
-                // Set the initial zoom factor
                 if (initialZoom != nil) {
                     do {
                         try self.setScaleInternal(initialZoom!)
@@ -541,6 +523,38 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
                 result(answer)
             }
         }
+    }
+
+    /// Get the preferred video format for the given video output.
+    private func getPreferredVideoFormat(videoOutput: AVCaptureVideoDataOutput) -> OSType {
+        // Define preferred pixel formats in order of preference
+        let preferredFormats: [OSType] = [
+            kCVPixelFormatType_32BGRA,
+            kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
+            kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+        ]
+        
+        // Get available formats and convert from NSNumber to OSType
+        let availableFormats = videoOutput.availableVideoPixelFormatTypes
+        let availablePixelFormats = availableFormats.compactMap { ($0 as NSNumber).uint32Value }
+        
+        // Find the first preferred format that is available
+        for format in preferredFormats {
+            if availablePixelFormats.contains(format) {
+                return format
+            }
+        }
+        
+        if let firstAvailable = availablePixelFormats.first {
+            return firstAvailable
+        }
+        
+        // Ultimate fallback: use the original default format
+        return kCVPixelFormatType_32BGRA
+    }
+
+    private func getSupportedLenses(_ result: @escaping FlutterResult) {
+        result(MobileScannerCameraSelector.getSupportedLenses())
     }
 
     /// Turn the torch on.
@@ -673,27 +687,41 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
     }
 
 #if os(iOS)
-    /// Set the device orientation if it differs from previous orientation
-    func setDeviceOrientation(orientation: UIDeviceOrientation) {
-        if (device == nil || deviceOrientation == orientation) {
-            return
-        }
-
-        deviceOrientation = orientation
-        updateOrientation(orientation: orientation)
-    }
-
-    /// Update the device orientation of the first open video output
-    func updateOrientation(orientation: UIDeviceOrientation) {
-        if let videoOutput = captureSession!.outputs.compactMap({ $0 as? AVCaptureVideoDataOutput }).first {
-            for connection in videoOutput.connections {
-                if connection.isVideoOrientationSupported {
-                    connection.videoOrientation = orientation.videoOrientation
-                }
+    /// Set up observer for interface orientation changes
+    private func setupInterfaceOrientationObserver() {
+        if #available(iOS 13.0, *) {
+            interfaceOrientationObserver = NotificationCenter.default.addObserver(
+                forName: UIDevice.orientationDidChangeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.updateVideoOrientationFromInterfaceOrientation()
             }
         }
     }
-    
+
+    /// Remove interface orientation observer
+    private func removeInterfaceOrientationObserver() {
+        if let observer = interfaceOrientationObserver {
+            NotificationCenter.default.removeObserver(observer)
+            interfaceOrientationObserver = nil
+        }
+    }
+
+    /// Update video orientation to match current interface orientation
+    private func updateVideoOrientationFromInterfaceOrientation() {
+        guard let videoOutput = captureSession?.outputs.compactMap({ $0 as? AVCaptureVideoDataOutput }).first else {
+            return
+        }
+
+        let newVideoOrientation = getVideoOrientation()
+
+        for connection in videoOutput.connections {
+            if connection.isVideoOrientationSupported {
+                connection.videoOrientation = newVideoOrientation
+            }
+        }
+    }
 #endif
 
     /// Reset the zoom factor of the camera
@@ -784,78 +812,6 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
         result(nil)
     }
 
-    private func takePicture(_ result: @escaping FlutterResult) {
-        guard let device = self.device else {
-            result(nil)
-            return
-        }
-        
-        if #available(macOS 10.15, *) {
-            guard let photoOutput = self.photoOutput as? AVCapturePhotoOutput else {
-                result(FlutterError(
-                    code: MobileScannerErrorCodes.PHOTO_CAPTURE_ERROR,
-                    message: MobileScannerErrorCodes.PHOTO_OUTPUT_NOT_AVAILABLE_ERROR_MESSAGE,
-                    details: nil))
-                return
-            }
-            
-            photoCompletionHandler = { [weak self] (data, error) in
-                DispatchQueue.main.async {
-                    if let error = error {
-                        result(FlutterError(
-                            code: MobileScannerErrorCodes.PHOTO_CAPTURE_ERROR,
-                            message: "\(MobileScannerErrorCodes.PHOTO_CAPTURE_FAILED_ERROR_MESSAGE): \(error.localizedDescription)",
-                            details: nil))
-                    } else if let data = data {
-                        result(FlutterStandardTypedData(bytes: data))
-                    } else {
-                        result(FlutterError(
-                            code: MobileScannerErrorCodes.PHOTO_CAPTURE_ERROR,
-                            message: MobileScannerErrorCodes.PHOTO_NO_IMAGE_DATA_ERROR_MESSAGE,
-                            details: nil))
-                    }
-                    self?.photoCompletionHandler = nil
-                }
-            }
-            
-            photoOutput.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
-        } else {
-            // For older macOS versions, use the current frame from the video stream
-            takePictureFromVideoBuffer(result)
-        }
-    }
-    
-    private func takePictureFromVideoBuffer(_ result: @escaping FlutterResult) {
-        guard let latestBuffer = self.latestBuffer else {
-            result(FlutterError(
-                code: MobileScannerErrorCodes.PHOTO_CAPTURE_ERROR,
-                message: MobileScannerErrorCodes.VIDEO_BUFFER_NOT_AVAILABLE_ERROR_MESSAGE,
-                details: nil))
-            return
-        }
-        
-        var cgImage: CGImage?
-        let status = VTCreateCGImageFromCVPixelBuffer(latestBuffer, options: nil, imageOut: &cgImage)
-        
-        guard status == kCVReturnSuccess, let image = cgImage else {
-            result(FlutterError(
-                code: MobileScannerErrorCodes.PHOTO_CAPTURE_ERROR,
-                message: MobileScannerErrorCodes.VIDEO_BUFFER_TO_IMAGE_CONVERSION_ERROR_MESSAGE,
-                details: nil))
-            return
-        }
-        
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            result(FlutterError(
-                code: MobileScannerErrorCodes.PHOTO_CAPTURE_ERROR,
-                message: MobileScannerErrorCodes.IMAGE_ENCODING_ERROR_MESSAGE,
-                details: nil))
-            return
-        }
-        
-        result(FlutterStandardTypedData(bytes: imageData))
-    }
-
     func pause(_ call: FlutterMethodCall, _ result: FlutterResult) {
         let force = (call.arguments as? Bool) ?? false
         if (!force) {
@@ -885,31 +841,30 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
     }
 
     private func releaseCamera() {
-        guard let captureSession = captureSession else {
-            return
-        }
-
-        guard let device = device else {
-            return
-        }
-
-        captureSession.stopRunning()
-        for input in captureSession.inputs {
-            captureSession.removeInput(input)
-        }
-        for output in captureSession.outputs {
-            captureSession.removeOutput(output)
-        }
-        device.removeObserver(self, forKeyPath: #keyPath(AVCaptureDevice.torchMode))
 #if os(iOS)
-        device.removeObserver(self, forKeyPath: #keyPath(AVCaptureDevice.videoZoomFactor))
+        removeInterfaceOrientationObserver()
 #endif
 
+        if let captureSession = captureSession {
+            captureSession.stopRunning()
+            for input in captureSession.inputs {
+                captureSession.removeInput(input)
+            }
+            for output in captureSession.outputs {
+                captureSession.removeOutput(output)
+            }
+
+            self.captureSession = nil
+        }
+
+        if let device = device {
+            device.removeObserver(self, forKeyPath: #keyPath(AVCaptureDevice.torchMode))
+#if os(iOS)
+            device.removeObserver(self, forKeyPath: #keyPath(AVCaptureDevice.videoZoomFactor))
+#endif
+            self.device = nil
+        }
         latestBuffer = nil
-        self.captureSession = nil
-        self.device = nil
-        self.photoOutput = nil
-        self.photoCompletionHandler = nil
     }
 
     private func releaseTexture() {
@@ -1037,30 +992,6 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
     }
 }
 
-// MARK: - AVCapturePhotoCaptureDelegate (macOS 10.15+)
-@available(macOS 10.15, *)
-extension MobileScannerPlugin: AVCapturePhotoCaptureDelegate {
-    public func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        if let error = error {
-            photoCompletionHandler?(nil, error)
-            return
-        }
-        
-        guard let imageData = photo.fileDataRepresentation() else {
-            photoCompletionHandler?(nil, NSError(domain: "MobileScannerPlugin", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to get image data"]))
-            return
-        }
-        
-        photoCompletionHandler?(imageData, nil)
-    }
-    
-    public func photoOutput(_ output: AVCapturePhotoOutput, didFinishCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings, error: Error?) {
-        if let error = error {
-            photoCompletionHandler?(nil, error)
-        }
-    }
-}
-
 class MapArgumentReader {
     let args: [String: Any]?
 
@@ -1097,7 +1028,7 @@ class MapArgumentReader {
         }
         var barcodeFormats:[VNBarcodeSymbology] = []
         syms.forEach { id in
-            if let bc:VNBarcodeSymbology = VNBarcodeSymbology.fromInt(id) {
+            if let bc: VNBarcodeSymbology = VNBarcodeSymbology.fromInt(id) {
                 barcodeFormats.append(bc)
             }
         }
@@ -1190,29 +1121,77 @@ extension VNBarcodeObservation {
         let width = distanceBetween(adjustedTopLeft, adjustedTopRight) * CGFloat(imageWidth)
         let height = distanceBetween(adjustedTopLeft, adjustedBottomLeft) * CGFloat(imageHeight)
         var rawBytes: FlutterStandardTypedData? = nil
-        
-        if #available(iOS 17.0, macOS 14.0, *) {
-            if let payloadData = payloadData {
-                rawBytes = FlutterStandardTypedData(bytes: payloadData)
+        var rawPayloadData: FlutterStandardTypedData? = nil
+        var displayValue: String? = payloadStringValue
+
+        // QR codes: parse the error-corrected payload bit stream directly.
+        // This correctly recovers the original bytes from Byte-mode segments,
+        // including non-ASCII content such as UTF-8 encoded text.
+        if let qrDescriptor = barcodeDescriptor as? CIQRCodeDescriptor,
+           let parsed = BarcodePayloadParser.parseQRPayload(from: qrDescriptor) {
+            rawBytes = FlutterStandardTypedData(bytes: parsed)
+            if let utf8String = String(data: parsed, encoding: .utf8) {
+                displayValue = utf8String
             }
         }
 
+        // Aztec, DataMatrix, PDF417, and linear formats: use the ISO-Latin-1
+        // round-trip. Apple Vision decodes raw payload bytes as Latin-1
+        // characters in payloadStringValue, so re-encoding back to Latin-1
+        // recovers the original bytes for values in the range 0x00–0x7F and
+        // 0xA0–0xFF. Bytes in 0x80–0x9F are not recoverable this way. see
+        // README for the full platform limitation note.
+        if rawBytes == nil, let string = payloadStringValue {
+            if let data = string.data(using: .isoLatin1) {
+                rawBytes = FlutterStandardTypedData(bytes: data)
+                if let utf8String = String(data: data, encoding: .utf8) {
+                    displayValue = utf8String
+                }
+            }
+        }
+
+        if #available(iOS 17.0, macOS 14.0, *) {
+            if let payloadData = payloadData {
+                rawPayloadData = FlutterStandardTypedData(bytes: payloadData)
+            }
+        }
+
+        // Detect barcode type from payload string value using heuristics
+        let barcodeType = payloadStringValue?.detectBarcodeType()
+
+        // On macOS, the front camera image is horizontally mirrored relative to
+        // Vision's coordinate labels, so topLeft/topRight (and bottomLeft/bottomRight)
+        // are swapped in screen space. Swap them here so that corners[0]→corners[1]
+        // points left-to-right in screen space, which is required for correct
+        // overlay text angle calculation.
+#if os(macOS)
+        let corners: [[String: CGFloat]] = [
+            ["x": topRightX, "y": topRightY],
+            ["x": topLeftX, "y": topLeftY],
+            ["x": bottomLeftX, "y": bottomLeftY],
+            ["x": bottomRightX, "y": bottomRightY],
+        ]
+#else
+        let corners: [[String: CGFloat]] = [
+            ["x": topLeftX, "y": topLeftY],
+            ["x": topRightX, "y": topRightY],
+            ["x": bottomRightX, "y": bottomRightY],
+            ["x": bottomLeftX, "y": bottomLeftY],
+        ]
+#endif
         let data = [
             // Clockwise, starting from the top-left corner.
-            "corners":  [
-                ["x": topLeftX, "y": topLeftY],
-                ["x": topRightX, "y": topRightY],
-                ["x": bottomRightX, "y": bottomRightY],
-                ["x": bottomLeftX, "y": bottomLeftY],
-            ],
+            "corners": corners,
             "format": symbology.toInt ?? -1,
             "rawBytes": rawBytes,
+            "rawPayloadData": rawPayloadData,
             "rawValue": payloadStringValue,
-            "displayValue": payloadStringValue,
+            "displayValue": displayValue,
             "size": [
                 "width": width,
                 "height": height,
             ],
+            "type": barcodeType,
         ] as [String : Any?]
         return data
     }
@@ -1238,6 +1217,10 @@ extension VNBarcodeSymbology {
             return VNBarcodeSymbology.ean13
         case 64:
             return VNBarcodeSymbology.ean8
+        case 126:
+            return VNBarcodeSymbology.i2of5
+        case 127:
+            return VNBarcodeSymbology.i2of5Checksum
         case 128:
             return VNBarcodeSymbology.itf14
         case 256:
@@ -1272,6 +1255,10 @@ extension VNBarcodeSymbology {
             return 32
         case VNBarcodeSymbology.ean8:
             return 64
+        case VNBarcodeSymbology.i2of5:
+            return 126
+        case VNBarcodeSymbology.i2of5Checksum:
+            return 127
         case VNBarcodeSymbology.itf14:
             return 128
         case VNBarcodeSymbology.qr:

@@ -1,3 +1,46 @@
+## 7.2.0
+
+**Highlights**
+
+* Added support for switching between lens types (normal, wide, zoom) using the `switchCamera()` method with `ToggleLensType` or `SelectCamera` options.
+* Added `rawDecodedBytes` field to `Barcode` which replaces `Barcode.rawBytes`. On Apple platforms, this returns a `DecodedVisionBarcodeBytes` containing `bytes` (decoded payload, without header/padding) and `rawBytes` (full raw payload, available on iOS 17.0+ / macOS 14.0+). On Android and web, this returns a `DecodedBarcodeBytes` containing `bytes`.
+
+**Improvements**
+
+* [Android] Migrated barcode bounding box from `boundingBox` to `cornerPoints` for more accurate scan window detection.
+* Added support for `ITF-Two-of-Five`.
+* Added constants for testing the method channel methods in `MobileScannerMethods` and `MobileScannerEvents`.
+* The global method `calculateBoxFitRatio()` is now deprecated.
+
+**Bug Fixes**
+
+* [Android] Fixed incorrect texture size on orientation change.
+* [Android] Fixed a bug where the `isPaused` flag was not reset when `start()` was called.
+* [Android] Fixed `imageAnalysis` not being unbound on dispose.
+* [Android] Fixed an issue where the app orientation handling was not respecting auto-rotate settings
+* [Apple] Fixed `rawBytes` returning incorrect data for barcodes containing non-ASCII characters (e.g. `ø`). For QR codes, bytes are now extracted directly from the error-corrected bit stream via `CIQRCodeDescriptor`, bypassing the Vision string API entirely. For Aztec, DataMatrix, PDF417 and linear formats, the ISO-Latin-1 round-trip is used to recover the original bytes from `payloadStringValue`.
+* [Apple] Fixed `displayValue` returning a garbled Latin-1 string (e.g. `hellÃ¸`) for barcodes with non-ASCII UTF-8 content. It is now correctly decoded to UTF-8 (e.g. `hellø`).
+* [Apple] Fixed a bug where the barcode type results did not have a value.
+* [Apple] Fixed camera rotating, even when rotation is locked.
+* [macOS] Fixed barcode overlay text displaying upside down.
+* Fixed barcode overlay rendering at wrong position after orientation change.
+* Fixed a bug where taps were ignored on the scanner widget.
+* Fixed a bug where a controller that was only disposed would throw an incorrect error code.
+
+### 7.1.4
+
+* [Apple] Fixed crash on iPhone 17 when starting MobileScanner by checking available pixel formats before setting video output settings. ([#1578](https://github.com/juliansteenbakker/mobile_scanner/issues/1578))
+
+### 7.1.3
+
+* Overlay: Updated `BarcodePainter` to receive `deviceOrientation` and dynamically adjust `cameraPreviewSize`, fixing barcode overlay misalignment during device rotation changes [](https://github.com/juliansteenbakker/mobile_scanner/issues/1462).
+
+* [Android] Refactored orientation detection to use `OrientationEventListener` instead of `BroadcastReceiver` for `ACTION_CONFIGURATION_CHANGED`, ensuring physical device orientation is captured correctly and preventing unwanted screen rotations on `MobileScanner` initialization [](https://github.com/juliansteenbakker/mobile_scanner/issues/1486).
+* [Android] Changed minSDK from 21 to 23 in line with Flutter requirements.
+* [Android] Removed deprecated renderscript api's, improved performance for analysis.
+* [Apple] Prevent half-stopped camera state causing false ALREADY_STARTED.
+* [Apple] Fixed a bug where invalid images would cause crashes when processing them with CoreVideo.
+
 ## 7.1.2
 
 * Fixed an issue with the `initialZoom` parameter.

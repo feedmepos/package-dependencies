@@ -34,6 +34,7 @@ See the example app for detailed implementation information.
 | returnImage  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :x: |
 | scanWindow   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :x: |
 | autoZoom     | :heavy_check_mark: | :x:                | :x:                | :x: |
+| lensType     | :heavy_check_mark: | :heavy_check_mark: | :x:                | :x: |
 
 ## Installation
 
@@ -148,6 +149,23 @@ MobileScanner(
 );
 ```
 
+#### Switching lens types
+
+On devices with multiple cameras (normal, wide, zoom), you can switch between lens types:
+
+```dart
+// Toggle through available lens types (normal -> wide -> zoom -> normal)
+await controller.switchCamera(const ToggleLensType());
+
+// Or select a specific lens type
+await controller.switchCamera(
+  const SelectCamera(lensType: CameraLensType.wide),
+);
+
+// Get supported lens types for the current camera
+final Set<CameraLensType> supportedLenses = await controller.getSupportedLenses();
+```
+
 #### Lifecycle changes
 
 If you want to pause the scanner when the app is inactive, you need to use `WidgetsBindingObserver`.
@@ -233,3 +251,36 @@ Future<void> dispose() async {
   await controller.dispose();
 }
 ```
+
+## Known Limitations
+
+### `rawBytes` on iOS and macOS
+
+Apple's Vision framework does not provide a direct API for reading the raw payload bytes of a scanned barcode. The `rawBytes` field is populated on a best-effort basis using two strategies, each with constraints.
+
+#### QR codes
+
+Two strategies are used in combination. For Byte-mode segments the error-corrected bit stream from `CIQRCodeDescriptor` is parsed directly. For all other modes the decoded string from `payloadStringValue` is re-encoded to Latin-1 as a fallback.
+
+| Scenario                                        | `rawBytes` result                                              |
+|-------------------------------------------------|----------------------------------------------------------------|
+| Byte mode (UTF-8, arbitrary binary data)        | Correct — parsed directly from bit stream                      |
+| Numeric mode (digits only)                      | Correct — recovered via string fallback                        |
+| Alphanumeric mode (uppercase + allowed symbols) | Correct — recovered via string fallback                        |
+| Kanji mode                                      | `null` — Japanese characters cannot round-trip through Latin-1 |
+
+#### Aztec, DataMatrix, PDF417 and linear formats (Code 128, EAN, etc.)
+
+Apple Vision decodes the payload as a string internally using a Latin-1 (ISO-8859-1) interpretation of the raw bytes. `rawBytes` is recovered by re-encoding that string back to Latin-1.
+
+| Byte value range                                            | `rawBytes` result                                                                                            |
+|-------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
+| `0x00`–`0x7F` (ASCII)                                       | Correct                                                                                                      |
+| `0xA0`–`0xFF` (upper Latin-1, includes `ø`, `é`, `ü`, etc.) | Correct                                                                                                      |
+| `0x80`–`0x9F` (Windows-1252 special range)                  | `null` — Apple maps these to Unicode code points above U+00FF, which cannot be round-tripped through Latin-1 |
+
+This means arbitrary binary payloads that happen to contain bytes in the `0x80`–`0x9F` range will result in `rawBytes` being `null` for those formats.
+
+#### Android and Web
+
+`rawBytes` is fully supported for all formats and encoding modes via MLKit (Android) and the ZXing-based library (Web).

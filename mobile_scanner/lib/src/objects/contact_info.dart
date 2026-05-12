@@ -19,11 +19,11 @@ class ContactInfo {
 
   /// Create a new [ContactInfo] instance from a map.
   factory ContactInfo.fromNative(Map<Object?, Object?> data) {
-    final List<Object?>? addresses = data['addresses'] as List<Object?>?;
-    final List<Object?>? emails = data['emails'] as List<Object?>?;
-    final List<Object?>? phones = data['phones'] as List<Object?>?;
-    final List<Object?>? urls = data['urls'] as List<Object?>?;
-    final Map<Object?, Object?>? name = data['name'] as Map<Object?, Object?>?;
+    final addresses = data['addresses'] as List<Object?>?;
+    final emails = data['emails'] as List<Object?>?;
+    final phones = data['phones'] as List<Object?>?;
+    final urls = data['urls'] as List<Object?>?;
+    final name = data['name'] as Map<Object?, Object?>?;
 
     return ContactInfo(
       addresses:
