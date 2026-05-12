@@ -861,19 +861,6 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
         result(nil)
     }
 
-    func stop(_ call: FlutterMethodCall, _ result: FlutterResult) {
-        let force = (call.arguments as? Bool) ?? false
-        if (!paused && stopped && !force) {
-            result(nil)
-
-            return
-        }
-        releaseCamera()
-        releaseTexture()
-
-        result(nil)
-    }
-
     private func takePicture(_ result: @escaping FlutterResult) {
         guard self.device != nil else {
             result(FlutterError(
