@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/widgets.dart';
 import 'package:mobile_scanner/src/enums/barcode_format.dart';
 import 'package:mobile_scanner/src/enums/camera_lens_type.dart';
@@ -140,6 +142,11 @@ abstract class MobileScannerPlatform extends PlatformInterface {
   /// If [window] is `null`, the scan window will be reset to the full screen.
   Future<void> updateScanWindow(Rect? window) {
     throw UnimplementedError('updateScanWindow() has not been implemented.');
+  }
+
+  /// Take a picture with the active camera and return the image bytes.
+  Future<Uint8List> takePicture() {
+    throw UnimplementedError('takePicture() has not been implemented.');
   }
 
   /// Dispose of this [MobileScannerPlatform] instance.

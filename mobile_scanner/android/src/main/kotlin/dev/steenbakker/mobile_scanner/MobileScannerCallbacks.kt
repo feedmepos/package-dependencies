@@ -9,3 +9,6 @@ typealias MobileScannerErrorCallback = (error: String) -> Unit
 typealias TorchStateCallback = (state: Int) -> Unit
 typealias ZoomScaleStateCallback = (zoomScale: Double) -> Unit
 typealias MobileScannerStartedCallback = (parameters: MobileScannerStartParameters) -> Unit
+typealias MobileScannerExceptionCallback = (exception: Exception) -> Unit
+typealias TakePictureSuccessCallback = (image: ByteArray) -> Unit
+typealias TakePictureErrorCallback = (exception: Exception) -> Unit

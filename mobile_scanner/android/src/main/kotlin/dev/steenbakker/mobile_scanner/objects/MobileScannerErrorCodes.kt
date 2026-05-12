@@ -25,5 +25,13 @@ class MobileScannerErrorCodes {
         const val UNSUPPORTED_OPERATION_ERROR = "MOBILE_SCANNER_UNSUPPORTED_OPERATION" // Reserved for future use.
         const val INVALID_FOCUS_POINT = "MOBILE_SCANNER_INVALID_FOCUS_POINT"
         const val INVALID_FOCUS_POINT_MESSAGE = "The focus coordinates are not valid."
+        const val IMAGE_CAPTURE_NOT_AVAILABLE_ERROR = "MOBILE_SCANNER_IMAGE_CAPTURE_NOT_AVAILABLE_ERROR"
+        const val IMAGE_CAPTURE_NOT_AVAILABLE_ERROR_MESSAGE = "Camera not started or image capture not available."
+        const val IMAGE_CAPTURE_READ_ERROR = "MOBILE_SCANNER_IMAGE_CAPTURE_READ_ERROR"
+        const val IMAGE_CAPTURE_READ_ERROR_MESSAGE = "Failed to read captured image."
+        const val IMAGE_CAPTURE_PROCESS_ERROR = "MOBILE_SCANNER_IMAGE_CAPTURE_PROCESS_ERROR"
+        const val IMAGE_CAPTURE_PROCESS_ERROR_MESSAGE = "Failed to process captured image."
+        const val IMAGE_CAPTURE_FAILED_ERROR = "MOBILE_SCANNER_IMAGE_CAPTURE_FAILED_ERROR"
+        const val IMAGE_CAPTURE_FAILED_ERROR_MESSAGE = "Image capture failed."
     }
 }

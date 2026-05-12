@@ -501,6 +501,24 @@ class MethodChannelMobileScanner extends MobileScannerPlatform {
   }
 
   @override
+  Future<Uint8List> takePicture() async {
+    final Uint8List? result = await methodChannel.invokeMethod<Uint8List>(
+      'takePicture',
+    );
+
+    if (result == null) {
+      throw const MobileScannerException(
+        errorCode: MobileScannerErrorCode.genericError,
+        errorDetails: MobileScannerErrorDetails(
+          message: 'Failed to take picture: null result',
+        ),
+      );
+    }
+
+    return result;
+  }
+
+  @override
   Future<Set<CameraLensType>> getSupportedLenses() async {
     final lensTypes = await methodChannel.invokeListMethod<Object?>(
       kGetSupportedLensesMethodName,
