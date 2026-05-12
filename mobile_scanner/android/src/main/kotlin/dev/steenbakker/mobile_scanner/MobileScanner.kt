@@ -705,9 +705,8 @@ class MobileScanner(
             return
         }
 
-        val outputFileOptions = ImageCapture.OutputFileOptions.Builder(
-            activity.applicationContext.cacheDir.resolve("mobile_scanner_${System.currentTimeMillis()}.jpg")
-        ).build()
+        val tempFile = activity.applicationContext.cacheDir.resolve("mobile_scanner_${System.currentTimeMillis()}.jpg")
+        val outputFileOptions = ImageCapture.OutputFileOptions.Builder(tempFile).build()
 
         imageCapture?.takePicture(
             outputFileOptions,
@@ -715,21 +714,17 @@ class MobileScanner(
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     try {
-                        val file = output.savedUri?.let { uri ->
-                            activity.contentResolver.openInputStream(uri)?.readBytes()
-                        }
-
-                        if (file != null) {
-                            onSuccess(file)
-                        } else {
-                            onError(ImageCaptureReadError())
-                        }
+                        val bytes = tempFile.readBytes()
+                        onSuccess(bytes)
                     } catch (e: Exception) {
                         onError(ImageCaptureProcessError())
+                    } finally {
+                        tempFile.delete()
                     }
                 }
 
                 override fun onError(exception: ImageCaptureException) {
+                    tempFile.delete()
                     onError(ImageCaptureFailed())
                 }
             }
