@@ -43,6 +43,9 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
     /// This is static to avoid accessing `self` in the `VNDetectBarcodesRequest` callback.
     private static var returnImage: Bool = false
 
+    /// The JPEG compression quality used when encoding a picture taken with `takePicture`.
+    private static let jpegCompressionQuality: CGFloat = 0.8
+
     var detectionSpeed: DetectionSpeed = DetectionSpeed.noDuplicates
 
     var timeoutSeconds: Double = 0
@@ -873,7 +876,10 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
 
     private func takePicture(_ result: @escaping FlutterResult) {
         guard self.device != nil else {
-            result(nil)
+            result(FlutterError(
+                code: MobileScannerErrorCodes.PHOTO_CAPTURE_ERROR,
+                message: MobileScannerErrorCodes.PHOTO_OUTPUT_NOT_AVAILABLE_ERROR_MESSAGE,
+                details: nil))
             return
         }
 
@@ -932,7 +938,7 @@ public class MobileScannerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler,
             return
         }
 
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+        guard let imageData = image.jpegData(compressionQuality: MobileScannerPlugin.jpegCompressionQuality) else {
             result(FlutterError(
                 code: MobileScannerErrorCodes.PHOTO_CAPTURE_ERROR,
                 message: MobileScannerErrorCodes.IMAGE_ENCODING_ERROR_MESSAGE,
