@@ -705,7 +705,7 @@ class MobileScanner(
             return
         }
 
-        val tempFile = activity.applicationContext.cacheDir.resolve("mobile_scanner_${System.currentTimeMillis()}.jpg")
+        val tempFile = activity.applicationContext.cacheDir.resolve("mobile_scanner_${System.currentTimeMillis()}_${java.util.UUID.randomUUID()}.jpg")
         val outputFileOptions = ImageCapture.OutputFileOptions.Builder(tempFile).build()
 
         imageCapture?.takePicture(
