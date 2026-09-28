@@ -7,6 +7,7 @@ public class SwiftVideoCompressPlugin: NSObject, FlutterPlugin {
     private var stopCommand = false
     private let channel: FlutterMethodChannel
     private let avController = AvController()
+    private let videoMaster = VideoMaster()
     
     init(channel: FlutterMethodChannel) {
         self.channel = channel
@@ -45,7 +46,29 @@ public class SwiftVideoCompressPlugin: NSObject, FlutterPlugin {
             let kbps = args!["kbps"] as? Int
             compressVideo(path, quality, deleteOrigin, startTime, duration, includeAudio,
                           frameRate, kbps, result)
+        case "probeVideo":
+            let path = args!["path"] as! String
+            if let probe = videoMaster.probe(path) {
+                result(Utility.keyValueToJson(probe as [String: Any?]))
+            } else {
+                result(FlutterError(code: channelName, message: "probeVideo failed", details: nil))
+            }
+        case "prepareVideoMaster":
+            let path = args!["path"] as! String
+            videoMaster.prepare(
+                path,
+                startMs: (args!["startMs"] as? NSNumber)?.doubleValue,
+                endMs: (args!["endMs"] as? NSNumber)?.doubleValue,
+                transcode: args!["bitrate"] as? NSNumber != nil,
+                hevc: args!["hevc"] as? Bool ?? false,
+                frameRate: (args!["frameRate"] as? NSNumber)?.int32Value ?? 60,
+                result: result
+            )
+        case "getFirstFrame":
+            let path = args!["path"] as! String
+            result(videoMaster.firstFrame(path))
         case "cancelCompression":
+            videoMaster.cancel()
             cancelCompression(result)
         case "deleteAllCache":
             Utility.deleteFile(Utility.basePath(), clear: true)
