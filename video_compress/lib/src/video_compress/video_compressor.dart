@@ -154,6 +154,45 @@ extension Compress on IVideoCompress {
     }
   }
 
+  /// The facts `prepareVideoMaster`'s choice is made from: display size (after rotation),
+  /// duration, frame rate, bitrate (bps), codec (`h264`, `hevc` or other), file size, and whether
+  /// the device can encode HEVC. Null when the file cannot be read as a video.
+  Future<Map<String, dynamic>?> probeVideo(String path) async {
+    final jsonStr = await _invoke<String>('probeVideo', {'path': path});
+    return jsonStr == null ? null : json.decode(jsonStr) as Map<String, dynamic>;
+  }
+
+  /// Writes a video master (FeedVibe `media §6.3`) trimmed to [startMs]..[endMs].
+  ///
+  /// With no [bitrate] the container is rewritten and no frame is re-encoded (the cut snaps to the
+  /// previous keyframe). With one, a single transcode: short edge 1080, [bitrate] bps, the input
+  /// frame rate capped at [frameRate], HEVC when [hevc]. Location metadata is dropped either way.
+  /// Answers the output file, or null on failure or cancellation.
+  Future<File?> prepareVideoMaster(
+    String path, {
+    int? startMs,
+    int? endMs,
+    int? bitrate,
+    int frameRate = 60,
+    bool hevc = false,
+  }) async {
+    final out = await _invoke<String>('prepareVideoMaster', {
+      'path': path,
+      'startMs': startMs,
+      'endMs': endMs,
+      'bitrate': bitrate,
+      'frameRate': frameRate,
+      'hevc': hevc,
+    });
+    return out == null ? null : File(out);
+  }
+
+  /// Frame 0 of [path] at full display resolution, as a lossless PNG. Null when it cannot be read.
+  Future<File?> getFirstFrame(String path) async {
+    final out = await _invoke<String>('getFirstFrame', {'path': path});
+    return out == null ? null : File(out);
+  }
+
   /// stop compressing the file that is currently being compressed.
   /// If there is no compression process, nothing will happen.
   Future<void> cancelCompression() async {

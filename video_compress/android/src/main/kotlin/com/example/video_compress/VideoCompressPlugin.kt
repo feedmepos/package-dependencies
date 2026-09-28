@@ -74,6 +74,29 @@ class VideoCompressPlugin : MethodCallHandler, FlutterPlugin {
                 transcodeFuture?.cancel(true)
                 result.success(false);
             }
+            "probeVideo" -> {
+                val path = call.argument<String>("path")!!
+                try {
+                    result.success(VideoMaster(context).probe(path).toString())
+                } catch (e: Exception) {
+                    result.error(channelName, "probeVideo failed", e.message)
+                }
+            }
+            "prepareVideoMaster" -> {
+                transcodeFuture = VideoMaster(context).prepare(
+                    path = call.argument<String>("path")!!,
+                    startMs = call.argument<Number>("startMs")?.toLong(),
+                    endMs = call.argument<Number>("endMs")?.toLong(),
+                    bitrate = call.argument<Number>("bitrate")?.toLong(),
+                    frameRate = call.argument<Int>("frameRate") ?: 30,
+                    hevc = call.argument<Boolean>("hevc") ?: false,
+                    onProgress = { channel.invokeMethod("updateProgress", it) },
+                    result = result,
+                )
+            }
+            "getFirstFrame" -> {
+                result.success(VideoMaster(context).firstFrame(call.argument<String>("path")!!))
+            }
             "compressVideo" -> {
                 val path = call.argument<String>("path")!!
                 val quality = call.argument<Int>("quality")!!
