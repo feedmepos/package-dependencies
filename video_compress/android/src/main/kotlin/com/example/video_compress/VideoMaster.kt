@@ -268,13 +268,28 @@ class VideoMaster(private val context: Context) {
         }
     }
 
-    /** Frame 0 at full display resolution, as a lossless PNG; the caller does the one encode. */
-    fun firstFrame(path: String): String? {
+    /**
+     * The frame at [positionMs] as a lossless PNG; the caller does the one encode. Full display
+     * resolution, or fitted within [maxEdge] when given.
+     */
+    fun frame(path: String, positionMs: Long, maxEdge: Int?): String? {
         val retriever = MediaMetadataRetriever()
         try {
             retriever.setDataSource(context, Uri.parse(path))
-            val frame = retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+            // Microseconds; CLOSEST is the exact frame, as iOS's zero tolerance is.
+            val full = retriever.getFrameAtTime(positionMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST)
                 ?: return null
+            val scale = maxEdge?.let { it.toFloat() / maxOf(full.width, full.height) }
+            val frame = if (scale != null && scale < 1f) {
+                Bitmap.createScaledBitmap(
+                    full,
+                    maxOf(1, (full.width * scale).toInt()),
+                    maxOf(1, (full.height * scale).toInt()),
+                    true,
+                ).also { full.recycle() }
+            } else {
+                full
+            }
             val out = File(outDir(), "frame-${UUID.randomUUID()}.png")
             FileOutputStream(out).use { frame.compress(Bitmap.CompressFormat.PNG, 100, it) }
             frame.recycle()

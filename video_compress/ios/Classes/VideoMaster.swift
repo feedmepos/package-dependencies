@@ -113,16 +113,18 @@ class VideoMaster {
         exporter?.cancelExport()
     }
 
-    /// Frame 0 at full display resolution, as a lossless PNG; the caller does the one encode.
-    func firstFrame(_ path: String) -> String? {
+    /// The frame at [positionMs] as a lossless PNG; the caller does the one encode. Full display
+    /// resolution, or fitted within [maxEdge] when given.
+    func frame(_ path: String, positionMs: Double, maxEdge: Double?) -> String? {
         let asset = AVURLAsset(url: Utility.getPathUrl(path))
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
         generator.requestedTimeToleranceBefore = .zero
         generator.requestedTimeToleranceAfter = .zero
-        generator.maximumSize = .zero
+        generator.maximumSize = maxEdge.map { CGSize(width: $0, height: $0) } ?? .zero
 
-        guard let image = try? generator.copyCGImage(at: .zero, actualTime: nil),
+        let time = CMTime(value: CMTimeValue(positionMs), timescale: 1000)
+        guard let image = try? generator.copyCGImage(at: time, actualTime: nil),
               let png = UIImage(cgImage: image).pngData() else { return nil }
         let out = outURL("png")
         guard (try? png.write(to: out)) != nil else { return nil }

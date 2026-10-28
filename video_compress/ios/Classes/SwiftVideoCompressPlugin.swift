@@ -64,9 +64,13 @@ public class SwiftVideoCompressPlugin: NSObject, FlutterPlugin {
                 frameRate: (args!["frameRate"] as? NSNumber)?.int32Value ?? 60,
                 result: result
             )
-        case "getFirstFrame":
+        case "getFrame":
             let path = args!["path"] as! String
-            result(videoMaster.firstFrame(path))
+            result(videoMaster.frame(
+                path,
+                positionMs: (args!["positionMs"] as? NSNumber)?.doubleValue ?? 0,
+                maxEdge: (args!["maxEdge"] as? NSNumber)?.doubleValue
+            ))
         case "cancelCompression":
             videoMaster.cancel()
             cancelCompression(result)
