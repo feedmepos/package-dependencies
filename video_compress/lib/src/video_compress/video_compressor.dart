@@ -187,11 +187,19 @@ extension Compress on IVideoCompress {
     return out == null ? null : File(out);
   }
 
-  /// Frame 0 of [path] at full display resolution, as a lossless PNG. Null when it cannot be read.
-  Future<File?> getFirstFrame(String path) async {
-    final out = await _invoke<String>('getFirstFrame', {'path': path});
+  /// The frame of [path] at [positionMs], as a lossless PNG: at full display resolution, or fitted
+  /// within [maxEdge] pixels when given. Null when it cannot be read.
+  Future<File?> getFrame(String path, {int positionMs = 0, int? maxEdge}) async {
+    final out = await _invoke<String>('getFrame', {
+      'path': path,
+      'positionMs': positionMs,
+      'maxEdge': maxEdge,
+    });
     return out == null ? null : File(out);
   }
+
+  /// Frame 0 of [path] at full display resolution, as a lossless PNG. Null when it cannot be read.
+  Future<File?> getFirstFrame(String path) => getFrame(path);
 
   /// stop compressing the file that is currently being compressed.
   /// If there is no compression process, nothing will happen.
