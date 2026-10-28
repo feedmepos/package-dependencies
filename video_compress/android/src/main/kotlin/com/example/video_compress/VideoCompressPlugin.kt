@@ -94,8 +94,14 @@ class VideoCompressPlugin : MethodCallHandler, FlutterPlugin {
                     result = result,
                 )
             }
-            "getFirstFrame" -> {
-                result.success(VideoMaster(context).firstFrame(call.argument<String>("path")!!))
+            "getFrame" -> {
+                result.success(
+                    VideoMaster(context).frame(
+                        call.argument<String>("path")!!,
+                        call.argument<Number>("positionMs")?.toLong() ?: 0L,
+                        call.argument<Number>("maxEdge")?.toInt(),
+                    )
+                )
             }
             "compressVideo" -> {
                 val path = call.argument<String>("path")!!
